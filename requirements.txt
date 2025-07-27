@@ -12,10 +12,14 @@ Jinja2==3.1.6
 joblib==1.5.1
 MarkupSafe==3.0.2
 nltk==3.9.1
+numpy==2.3.2
 packaging==25.0
 regex==2024.11.6
 requests==2.32.4
+scikit-learn==1.7.1
+scipy==1.16.1
 soupsieve==2.7
+threadpoolctl==3.6.0
 tqdm==4.67.1
 typing_extensions==4.14.1
 urllib3==2.5.0
