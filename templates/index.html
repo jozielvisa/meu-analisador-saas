@@ -78,11 +78,25 @@
             keywordsList.innerHTML = ''; // Limpa a lista de palavras-chave
             loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido no início
 
-            // --- Validação da URL ---
+            // --- Validação da URL (Aprimorada) ---
+            // Verifica se a URL está vazia
             if (!url) {
-                errorAlert.textContent = 'Por favor, insira uma URL válida para análise.';
-                errorAlert.style.display = 'block'; // Mostra o alerta de erro
-                return; // Para a execução da função
+                errorAlert.textContent = 'Por favor, insira uma URL para análise.';
+                errorAlert.style.display = 'block';
+                loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido
+                return;
+            }
+
+            // Expressão regular para uma validação de URL mais robusta
+            // Ela verifica se a URL começa com http:// ou https://
+            // e tem pelo menos um domínio (ex: www.site.com ou site.com)
+            const urlPattern = /^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/[a-zA-Z0-9]+\.[^\s]{2,}|[a-zA-Z0-9]+\.[^\s]{2,})$/i;
+
+            if (!urlPattern.test(url)) {
+                errorAlert.textContent = 'Formato de URL inválido. Por favor, use "https://", "http://", ou um domínio válido como "www.site.com".';
+                errorAlert.style.display = 'block';
+                loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido
+                return;
             }
 
             // --- Iniciar o processo de análise ---
