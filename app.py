@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import nltk
 from collections import Counter
 import re # Para expressões regulares
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 app = Flask(__name__)
 
@@ -76,11 +77,48 @@ def analyze():
         # len(word) > 2: Remove palavras muito curtas (ex: "a", "o", "e", que podem ter escapado).
         filtered_words = [word for word in words if word.isalpha() and word not in stop_words_pt and len(word) > 2]
 
-        # Conta a frequência de cada palavra filtrada.
-        word_counts = Counter(filtered_words)
+        # --- 3. Processamento de Linguagem Natural (PLN) com TF-IDF ---
+        # O TfidfVectorizer precisa de uma string de texto, não uma lista de palavras.
+        # Juntamos as palavras filtradas de volta em uma string.
+        processed_text = " ".join(filtered_words)
 
-        # Pega as 20 palavras mais comuns com suas contagens.
-        top_keywords = word_counts.most_common(20)
+        # Se não houver texto processado, não podemos calcular TF-IDF
+        if not processed_text.strip():
+            return jsonify({"url": url, "top_keywords": []}), 200
+
+        # Inicializa o TfidfVectorizer.
+        # analyzer='word': Analisa por palavras.
+        # stop_words=stop_words_pt: Usa nossas stopwords em português.
+        # max_features=200: Considera no máximo 200 features (palavras) mais relevantes para a análise.
+        # ngram_range=(1,2): Considera palavras únicas (unigrams) e pares de palavras (bigrams).
+        # Isso pode capturar termos como "marketing digital".
+        vectorizer = TfidfVectorizer(
+            analyzer='word',
+            stop_words=list(stop_words_pt), # Convertemos para lista, pois o TfidfVectorizer espera uma lista ou None
+            max_features=200,
+            ngram_range=(1, 2)
+        )
+
+        # Ajusta o vetorizador ao texto e o transforma em uma matriz TF-IDF.
+        # É importante que o texto seja passado como uma lista de documentos, mesmo que seja apenas um.
+        tfidf_matrix = vectorizer.fit_transform([processed_text])
+
+        # Pega os nomes das features (as palavras/ngramas)
+        feature_names = vectorizer.get_feature_names_out()
+
+        # Pega os scores TF-IDF para o nosso documento (primeira linha da matriz)
+        tfidf_scores = tfidf_matrix.toarray()[0]
+
+        # Cria uma lista de tuplas (palavra, score TF-IDF)
+        word_tfidf_scores = list(zip(feature_names, tfidf_scores))
+
+        # Ordena as palavras pelos scores TF-IDF em ordem decrescente
+        # Pega as 20 palavras/ngramas com os scores TF-IDF mais altos.
+        top_keywords_tfidf = sorted(word_tfidf_scores, key=lambda x: x[1], reverse=True)[:20]
+
+        # Formata os resultados para ter a palavra e seu score (arredondado para 4 casas decimais)
+        # O score é um float, e não uma contagem inteira.
+        top_keywords = [(word, round(score, 4)) for word, score in top_keywords_tfidf]
 
         # --- 4. Retorno dos Resultados ---
         # Retorna os resultados em formato JSON para o frontend.
