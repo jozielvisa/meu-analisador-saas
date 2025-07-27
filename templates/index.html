@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Concorrência - MVP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Estilos CSS básicos para a página */
+        body { padding-top: 50px; background-color: #f8f9fa; }
+        .container { max-width: 800px; background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,.05); }
+        #loading { display: none; margin-top: 20px; } /* Escondido por padrão */
+        #results { display: none; margin-top: 20px; } /* Escondido por padrão */
+        #errorAlert { display: none; margin-top: 20px; } /* Escondido por padrão */
+        .list-group-item { display: flex; justify-content: space-between; align-items: center; }
+        .spinner-border { width: 3rem; height: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center text-primary">Analisador de Concorrência (MVP)</h1>
+        <p class="text-center text-muted">Insira a URL de um concorrente para ver as palavras-chave mais usadas no conteúdo dele.</p>
+        
+        <div class="input-group mb-3">
+            <input type="url" id="competitorUrl" class="form-control form-control-lg" placeholder="Ex: https://www.exemplo.com.br" required>
+            <button class="btn btn-primary btn-lg" id="analyzeButton">Analisar</button>
+        </div>
+
+        <div id="loading" class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="mt-2 text-muted">Analisando o site, por favor aguarde...</p>
+        </div>
+
+        <div id="results">
+            <h2 class="text-success">Resultados para: <span id="analyzedUrl" class="text-break"></span></h2>
+            <ul class="list-group" id="keywordsList">
+                </ul>
+        </div>
+
+        <div id="errorAlert" class="alert alert-danger" role="alert">
+            </div>
+    </div>
+
+    <script>
+        // Adiciona um "ouvinte de evento" ao botão de análise
+        document.getElementById('analyzeButton').addEventListener('click', async () => {
+            const urlInput = document.getElementById('competitorUrl');
+            const url = urlInput.value.trim(); // Pega o valor do campo e remove espaços extras
+            
+            // Seleciona os elementos HTML que vamos manipular
+            const loadingDiv = document.getElementById('loading');
+            const resultsDiv = document.getElementById('results');
+            const errorAlert = document.getElementById('errorAlert');
+            const keywordsList = document.getElementById('keywordsList');
+            const analyzedUrlSpan = document.getElementById('analyzedUrl');
+
+            // --- Resetar o estado da interface ---
+            // Esconde resultados e mensagens de erro anteriores
+            resultsDiv.style.display = 'none';
+            errorAlert.style.display = 'none';
+            keywordsList.innerHTML = ''; // Limpa a lista de palavras-chave
+            loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido no início
+
+            // --- Validação da URL ---
+            if (!url) {
+                errorAlert.textContent = 'Por favor, insira uma URL válida para análise.';
+                errorAlert.style.display = 'block'; // Mostra o alerta de erro
+                return; // Para a execução da função
+            }
+
+            // --- Iniciar o processo de análise ---
+            loadingDiv.style.display = 'block'; // Mostra o indicador de carregamento
+
+            try {
+                // Faz a requisição POST para o backend (para a rota /analyze)
+                const response = await fetch('/analyze', {
+                    method: 'POST', // Método HTTP POST
+                    headers: {
+                        'Content-Type': 'application/json', // Informa que o corpo da requisição é JSON
+                    },
+                    body: JSON.stringify({ url: url }), // Converte a URL para JSON e envia
+                });
+
+                const data = await response.json(); // Converte a resposta do backend de JSON para um objeto JavaScript
+
+                if (response.ok) { // Se a resposta HTTP for um sucesso (código 2xx)
+                    analyzedUrlSpan.textContent = data.url; // Exibe a URL analisada
+                    // Itera sobre as palavras-chave recebidas e as adiciona à lista
+                    data.top_keywords.forEach(item => {
+                        const li = document.createElement('li'); // Cria um novo item de lista
+                        li.className = 'list-group-item'; // Adiciona classes do Bootstrap para estilo
+                        // Formata o texto como "palavra (contagem vezes)"
+                        li.innerHTML = `<strong>${item[0]}</strong> <span class="badge bg-secondary rounded-pill">${item[1]} vezes</span>`;
+                        keywordsList.appendChild(li); // Adiciona o item à lista
+                    });
+                    resultsDiv.style.display = 'block'; // Mostra a área de resultados
+                } else { // Se a resposta do backend for um erro (código 4xx ou 5xx)
+                    errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar a URL.';
+                    errorAlert.style.display = 'block'; // Mostra o alerta de erro
+                }
+            } catch (error) { // Captura erros de rede (ex: servidor não está rodando, problema de conexão)
+                errorAlert.textContent = `Erro de conexão ou problema inesperado: ${error.message}. Verifique se o backend está rodando.`;
+                errorAlert.style.display = 'block';
+            } finally {
+                loadingDiv.style.display = 'none'; // Sempre esconde o indicador de carregamento no final
+            }
+        });
+    </script>
+</body>
+</html>
