@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template
 import requests
 from bs4 import BeautifulSoup
 import nltk
-from collections import Counter
+from collections import Counter # Counter não será mais usado diretamente para TF-IDF, mas pode ser útil para depuração ou futuras funcionalidades
 import re # Para expressões regulares
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -10,13 +10,7 @@ app = Flask(__name__)
 
 # --- Configuração do NLTK para português ---
 # Carrega as stopwords em português.
-# Presume que os recursos 'punkt' e 'stopwords' já foram baixados manualmente.
-# Para o ambiente de produção (Render), certifique-se de que esses downloads são feitos
-# durante o processo de build ou pré-deploy.
-
-stop_words_pt = set(nltk.corpus.stopwords.words('portuguese'))
-
-# Carrega as stopwords em português
+# Presume que os recursos 'punkt' e 'stopwords' já foram baixados durante o processo de build do Render.
 stop_words_pt = set(nltk.corpus.stopwords.words('portuguese'))
 
 # --- Rota Principal (Endpoint do Servidor Web) ---
@@ -50,7 +44,7 @@ def analyze():
 
         # --- 2. Pré-processamento do Conteúdo ---
         # Remove elementos HTML que geralmente não contêm texto relevante
-        # ou que podem poluir a análise (scripts JavaScript, estilos CSS, cabeçalhos, rodapés, menus de navegação).
+        # ou que podem poluir a análise (ex: scripts JavaScript, estilos CSS, cabeçalhos, rodapés, menus de navegação).
         for script_or_style in soup(['script', 'style', 'header', 'footer', 'nav', 'aside']):
             script_or_style.decompose() # Remove o elemento e seu conteúdo
 
@@ -84,7 +78,8 @@ def analyze():
 
         # Se não houver texto processado, não podemos calcular TF-IDF
         if not processed_text.strip():
-            return jsonify({"url": url, "top_keywords": []}), 200
+            # Retorna um erro 400 se não houver texto suficiente para análise
+            return jsonify({"error": "Não foi possível extrair conteúdo textual relevante suficiente desta URL para análise."}), 400
 
         # Inicializa o TfidfVectorizer.
         # analyzer='word': Analisa por palavras.
@@ -114,21 +109,27 @@ def analyze():
 
         # Ordena as palavras pelos scores TF-IDF em ordem decrescente
         # Pega as 20 palavras/ngramas com os scores TF-IDF mais altos.
-        top_keywords_tfidf = sorted(word_tfidf_scores, key=lambda x: x[1], reverse=True)[:20]
+        top_keywords = sorted(word_tfidf_scores, key=lambda x: x[1], reverse=True)[:20]
+
+        # --- VERIFICAÇÃO ADICIONAL PARA POUCAS PALAVRAS-CHAVE RELEVANTES ---
+        if not top_keywords: # Se a lista de palavras-chave top_keywords estiver vazia
+            return jsonify({
+                "error": "Não foi possível extrair palavras-chave relevantes suficientes desta URL. O conteúdo pode ser muito curto, não textual, ou não estar em português."
+            }), 400 # Retorna um erro 400 (Bad Request)
 
         # Formata os resultados para ter a palavra e seu score (arredondado para 4 casas decimais)
         # O score é um float, e não uma contagem inteira.
-        top_keywords = [(word, round(score, 4)) for word, score in top_keywords_tfidf]
+        top_keywords_formatted = [(word, round(score, 4)) for word, score in top_keywords]
 
         # --- 4. Retorno dos Resultados ---
         # Retorna os resultados em formato JSON para o frontend.
         # jsonify() converte dicionários Python para JSON.
-        return jsonify({"url": url, "top_keywords": top_keywords})
+        return jsonify({"url": url, "top_keywords": top_keywords_formatted})
 
     # --- Tratamento de Erros ---
     except requests.exceptions.RequestException as e:
         # Captura erros relacionados a problemas de rede ou HTTP (ex: site não encontrado, timeout).
-        return jsonify({"error": f"Erro ao acessar a URL: {e}"}), 500
+        return jsonify({"error": f"Erro ao acessar a URL: {e}. Verifique se a URL está correta e acessível."}), 500
     except Exception as e:
         # Captura qualquer outro erro inesperado.
         return jsonify({"error": f"Ocorreu um erro inesperado: {e}"}), 500

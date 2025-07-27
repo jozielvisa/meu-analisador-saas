@@ -124,6 +124,9 @@
                         analyzedUrlSpan.textContent = data.url; // Exibe a URL analisada
                         lastAnalyzedKeywords = data.top_keywords; // **ARMAZENA OS DADOS AQUI PARA EXPORTAÇÃO**
 
+                        // Limpa o campo da URL
+                        competitorUrlInput.value = ''; //
+
                         // --- Prepara os dados para o gráfico ---
                         const labels = data.top_keywords.map(item => item[0]);
                         const scores = data.top_keywords.map(item => item[1]);
