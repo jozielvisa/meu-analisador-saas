@@ -8,19 +8,12 @@ import re # Para expressões regulares
 app = Flask(__name__)
 
 # --- Configuração do NLTK para português ---
-# Baixa os recursos 'punkt' e 'stopwords' do NLTK.
-# 'punkt' é para tokenização (dividir texto em palavras/frases).
-# 'stopwords' é para uma lista de palavras comuns que queremos ignorar (ex: "e", "de", "para").
-# A linha abaixo vai tentar baixar se não encontrar. Já fizemos isso no passo anterior, mas é bom ter para garantir.
-try:
-    nltk.data.find('tokenizers/punkt')
-except nltk.downloader.DownloadError:
-    nltk.download('punkt')
+# Carrega as stopwords em português.
+# Presume que os recursos 'punkt' e 'stopwords' já foram baixados manualmente.
+# Para o ambiente de produção (Render), certifique-se de que esses downloads são feitos
+# durante o processo de build ou pré-deploy.
 
-try:
-    nltk.data.find('corpora/stopwords')
-except nltk.downloader.DownloadError:
-    nltk.download('stopwords')
+stop_words_pt = set(nltk.corpus.stopwords.words('portuguese'))
 
 # Carrega as stopwords em português
 stop_words_pt = set(nltk.corpus.stopwords.words('portuguese'))
