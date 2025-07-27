@@ -52,158 +52,216 @@
             <h3 class="mt-4">Palavras-chave Detalhadas:</h3>
             <ul class="list-group" id="keywordsList">
                 </ul>
+
+            <div class="mt-3 text-center">
+                <button class="btn btn-success me-2" id="exportCsvButton" style="display: none;">Exportar para CSV</button>
+                <button class="btn btn-info" id="exportJsonButton" style="display: none;">Exportar para JSON</button>
         </div>
 
         <div id="errorAlert" class="alert alert-danger" role="alert" style="display: none;">
             </div>
     </div>
 
-    <script>
-        // Adiciona um "ouvinte de evento" ao botão de análise
-        document.getElementById('analyzeButton').addEventListener('click', async () => {
-            const urlInput = document.getElementById('competitorUrl');
-            const url = urlInput.value.trim(); // Pega o valor do campo e remove espaços extras
-            
-            // Seleciona os elementos HTML que vamos manipular
+    </script> <script>
+        // Variável global (ou "quase" global, pois está dentro do DOMContentLoaded) para armazenar os dados.
+        // É importante que ela seja declarada FORA do listener do analyzeButton, mas dentro do DOMContentLoaded.
+        let lastAnalyzedKeywords = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Seleciona todos os elementos HTML que vamos manipular
+            const competitorUrlInput = document.getElementById('competitorUrl');
+            const analyzeButton = document.getElementById('analyzeButton');
             const loadingDiv = document.getElementById('loading');
             const resultsDiv = document.getElementById('results');
             const errorAlert = document.getElementById('errorAlert');
             const keywordsList = document.getElementById('keywordsList');
             const analyzedUrlSpan = document.getElementById('analyzedUrl');
+            const exportCsvButton = document.getElementById('exportCsvButton'); // Referência ao botão CSV
+            const exportJsonButton = document.getElementById('exportJsonButton'); // Referência ao botão JSON
 
-            // --- Resetar o estado da interface ---
-            // Esconde resultados e mensagens de erro anteriores
-            resultsDiv.style.display = 'none';
-            errorAlert.style.display = 'none';
-            keywordsList.innerHTML = ''; // Limpa a lista de palavras-chave
-            loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido no início
 
-            // --- Validação da URL (Aprimorada) ---
-            // Verifica se a URL está vazia
-            if (!url) {
-                errorAlert.textContent = 'Por favor, insira uma URL para análise.';
-                errorAlert.style.display = 'block';
-                loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido
-                return;
-            }
+            // --- Adiciona o "ouvinte de evento" ao botão de análise ---
+            analyzeButton.addEventListener('click', async () => {
+                const url = competitorUrlInput.value.trim();
 
-            // Expressão regular para uma validação de URL mais robusta
-            // Ela verifica se a URL começa com http:// ou https://
-            // e tem pelo menos um domínio (ex: www.site.com ou site.com)
-            const urlPattern = /^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/[a-zA-Z0-9]+\.[^\s]{2,}|[a-zA-Z0-9]+\.[^\s]{2,})$/i;
+                // --- Resetar o estado da interface ---
+                resultsDiv.style.display = 'none';
+                errorAlert.style.display = 'none';
+                keywordsList.innerHTML = ''; // Limpa a lista de palavras-chave
+                loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido no início
+                exportCsvButton.style.display = 'none'; // Esconde os botões de exportação
+                exportJsonButton.style.display = 'none'; // Esconde os botões de exportação
 
-            if (!urlPattern.test(url)) {
-                errorAlert.textContent = 'Formato de URL inválido. Por favor, use "https://", "http://", ou um domínio válido como "www.site.com".';
-                errorAlert.style.display = 'block';
-                loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido
-                return;
-            }
+                // --- Validação da URL (Aprimorada) ---
+                if (!url) {
+                    errorAlert.textContent = 'Por favor, insira uma URL para análise.';
+                    errorAlert.style.display = 'block';
+                    return; // Para a execução da função
+                }
 
-            // --- Iniciar o processo de análise ---
-            loadingDiv.style.display = 'block'; // Mostra o indicador de carregamento
+                const urlPattern = /^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/[a-zA-Z0-9]+\.[^\s]{2,}|[a-zA-Z0-9]+\.[^\s]{2,})$/i;
 
-            try {
-                // Faz a requisição POST para o backend (para a rota /analyze)
-                const response = await fetch('/analyze', {
-                    method: 'POST', // Método HTTP POST
-                    headers: {
-                        'Content-Type': 'application/json', // Informa que o corpo da requisição é JSON
-                    },
-                    body: JSON.stringify({ url: url }), // Converte a URL para JSON e envia
-                });
+                if (!urlPattern.test(url)) {
+                    errorAlert.textContent = 'Formato de URL inválido. Por favor, use "https://", "http://", ou um domínio válido como "www.site.com".';
+                    errorAlert.style.display = 'block';
+                    return; // Para a execução da função
+                }
 
-                const data = await response.json(); // Converte a resposta do backend de JSON para um objeto JavaScript
+                // --- Iniciar o processo de análise ---
+                loadingDiv.style.display = 'block'; // Mostra o indicador de carregamento
 
-                if (response.ok) { // Se a resposta HTTP for um sucesso (código 2xx)
-                    analyzedUrlSpan.textContent = data.url; // Exibe a URL analisada
-                    // Itera sobre as palavras-chave recebidas e as adiciona à lista
-                    // --- Prepara os dados para o gráfico ---
-                    const labels = data.top_keywords.map(item => item[0]); // Palavras-chave
-                    const scores = data.top_keywords.map(item => item[1]); // Scores TF-IDF
+                try {
+                    // Faz a requisição POST para o backend (para a rota /analyze)
+                    const response = await fetch('/analyze', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: url }),
+                    });
 
-                    // Destrói o gráfico anterior se ele existir para evitar sobreposição
-                    if (window.keywordsChartInstance) {
-                        window.keywordsChartInstance.destroy();
-                    }
+                    const data = await response.json();
 
-                    // Pega o contexto do canvas para desenhar o gráfico
-                    const ctx = document.getElementById('keywordsChart').getContext('2d');
+                    if (response.ok) { // Se a resposta HTTP for um sucesso (código 2xx)
+                        analyzedUrlSpan.textContent = data.url; // Exibe a URL analisada
+                        lastAnalyzedKeywords = data.top_keywords; // **ARMAZENA OS DADOS AQUI PARA EXPORTAÇÃO**
 
-                    // Cria o novo gráfico de barras
-                    window.keywordsChartInstance = new Chart(ctx, {
-                        type: 'bar', // Tipo de gráfico: barras
-                        data: {
-                            labels: labels, // As palavras no eixo X
-                            datasets: [{
-                                label: 'Score TF-IDF', // Legenda do dataset
-                                data: scores, // Os scores no eixo Y
-                                backgroundColor: 'rgba(54, 162, 235, 0.6)', // Cor das barras
-                                borderColor: 'rgba(54, 162, 235, 1)', // Cor da borda das barras
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false, // Permite que o gráfico se ajuste ao tamanho do div
-                            indexAxis: 'y', // Define o eixo X como o índice (palavras-chave) para barras horizontais
-                            plugins: {
-                                legend: {
-                                    display: false // Não exibir a legenda do dataset
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            let label = context.dataset.label || '';
-                                            if (label) {
-                                                label += ': ';
+                        // --- Prepara os dados para o gráfico ---
+                        const labels = data.top_keywords.map(item => item[0]);
+                        const scores = data.top_keywords.map(item => item[1]);
+
+                        // Destrói o gráfico anterior se ele existir para evitar sobreposição
+                        if (window.keywordsChartInstance) {
+                            window.keywordsChartInstance.destroy();
+                        }
+
+                        // Pega o contexto do canvas para desenhar o gráfico
+                        const ctx = document.getElementById('keywordsChart').getContext('2d');
+
+                        // Cria o novo gráfico de barras
+                        window.keywordsChartInstance = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Score TF-IDF',
+                                    data: scores,
+                                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                                    borderColor: 'rgba(54, 162, 235, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                indexAxis: 'y',
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                let label = context.dataset.label || '';
+                                                if (label) { label += ': '; }
+                                                if (context.parsed.x !== null) { label += context.parsed.x.toFixed(4); }
+                                                return label;
                                             }
-                                            if (context.parsed.x !== null) {
-                                                label += context.parsed.x.toFixed(4); // Formata o score
-                                            }
-                                            return label;
                                         }
                                     }
-                                }
-                            },
-                            scales: {
-                                x: {
-                                    beginAtZero: true, // Começa o eixo X do zero
-                                    title: {
-                                        display: true,
-                                        text: 'Score TF-IDF'
-                                    }
                                 },
-                                y: {
-                                    // Adicionamos um título ao eixo Y para deixar claro o que são as labels
-                                    title: {
-                                        display: true,
-                                        text: 'Palavra-chave'
+                                scales: {
+                                    x: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: 'Score TF-IDF' }
+                                    },
+                                    y: {
+                                        title: { display: true, text: 'Palavra-chave' }
                                     }
                                 }
                             }
-                        }
-                    });
+                        });
 
-                    // --- Ainda exibe a lista detalhada abaixo do gráfico ---
-                    keywordsList.innerHTML = ''; // Limpa a lista antes de adicionar novos itens
-                    data.top_keywords.forEach(item => {
-                        const li = document.createElement('li');
-                        li.className = 'list-group-item';
-                        li.innerHTML = `<strong>${item[0]}</strong> <span class="badge bg-secondary rounded-pill">${item[1].toFixed(4)}</span>`; // Formata o score
-                        keywordsList.appendChild(li);
-                    });
-                    resultsDiv.style.display = 'block'; // Mostra a área de resultados
-                } else { // Se a resposta do backend for um erro (código 4xx ou 5xx)
-                    errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar a URL.';
-                    errorAlert.style.display = 'block'; // Mostra o alerta de erro
+                        // --- Ainda exibe a lista detalhada abaixo do gráfico ---
+                        keywordsList.innerHTML = ''; // Limpa a lista antes de adicionar novos itens
+                        data.top_keywords.forEach(item => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item';
+                            li.innerHTML = `<strong>${item[0]}</strong> <span class="badge bg-secondary rounded-pill">${item[1].toFixed(4)}</span>`;
+                            keywordsList.appendChild(li);
+                        });
+
+                        // Mostra a área de resultados e os botões de exportação
+                        resultsDiv.style.display = 'block';
+                        exportCsvButton.style.display = 'inline-block'; // Mostra o botão CSV
+                        exportJsonButton.style.display = 'inline-block'; // Mostra o botão JSON
+
+                    } else { // Se a resposta do backend for um erro (código 4xx ou 5xx)
+                        errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar a URL.';
+                        errorAlert.style.display = 'block';
+                        // Esconde os botões de exportação em caso de erro
+                        exportCsvButton.style.display = 'none';
+                        exportJsonButton.style.display = 'none';
+                    }
+                } catch (error) { // Captura erros de rede
+                    errorAlert.textContent = `Erro de conexão ou problema inesperado: ${error.message}. Verifique se o backend está rodando.`;
+                    errorAlert.style.display = 'block';
+                    // Esconde os botões de exportação em caso de erro
+                    exportCsvButton.style.display = 'none';
+                    exportJsonButton.style.display = 'none';
+                } finally {
+                    loadingDiv.style.display = 'none'; // Sempre esconde o indicador de carregamento no final
                 }
-            } catch (error) { // Captura erros de rede (ex: servidor não está rodando, problema de conexão)
-                errorAlert.textContent = `Erro de conexão ou problema inesperado: ${error.message}. Verifique se o backend está rodando.`;
-                errorAlert.style.display = 'block';
-            } finally {
-                loadingDiv.style.display = 'none'; // Sempre esconde o indicador de carregamento no final
+            }); // Fim do addEventListener do analyzeButton
+
+
+            // ***************************************************************
+            // FUNÇÕES DE EXPORTAÇÃO E LISTENERS DE EVENTO PARA ELAS
+            // ESTÃO AQUI FORA DO analyzeButton.addEventListener
+            // ***************************************************************
+
+            // Função para exportar para CSV
+            function exportToCsv() {
+                if (lastAnalyzedKeywords.length === 0) {
+                    alert('Nenhum dado para exportar.');
+                    return;
+                }
+                let csvContent = "Palavra-chave,Score TF-IDF\n";
+                lastAnalyzedKeywords.forEach(item => {
+                    const score = typeof item[1] === 'number' ? item[1].toFixed(4) : item[1];
+                    const keyword = `"${item[0].replace(/"/g, '""')}"`;
+                    csvContent += `${keyword},${score}\n`;
+                });
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.setAttribute('download', 'palavras_chave_analise.csv');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
-        });
+
+            // Função para exportar para JSON
+            function exportToJson() {
+                if (lastAnalyzedKeywords.length === 0) {
+                    alert('Nenhum dado para exportar.');
+                    return;
+                }
+                const jsonData = lastAnalyzedKeywords.map(item => ({
+                    "palavra_chave": item[0],
+                    "score_tf_idf": parseFloat(item[1].toFixed(4))
+                }));
+                const jsonContent = JSON.stringify(jsonData, null, 2);
+                const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.setAttribute('download', 'palavras_chave_analise.json');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            // Adiciona os ouvintes de evento aos botões de exportação
+            exportCsvButton.addEventListener('click', exportToCsv);
+            exportJsonButton.addEventListener('click', exportToJson);
+
+        }); // Fim do document.addEventListener('DOMContentLoaded', function() {
     </script>
 </body>
 </html>
