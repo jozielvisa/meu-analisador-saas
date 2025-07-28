@@ -3,211 +3,302 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analisador de Concorrência - MVP</title>
+    <title>Analisador de Concorrência - Múltiplas URLs</title>
+    <!-- Inclui o Bootstrap para deixar o visual mais bonito e responsivo -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        /* Estilos CSS básicos para a página */
-        body { padding-top: 50px; background-color: #f8f9fa; }
-        .container { max-width: 800px; background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,.05); }
-        #loading { display: none; margin-top: 20px; } /* Escondido por padrão */
-        #results { display: none; margin-top: 20px; } /* Escondido por padrão */
-        #errorAlert { display: none; margin-top: 20px; } /* Escondido por padrão */
-        .list-group-item { display: flex; justify-content: space-between; align-items: center; }
-        .spinner-border { width: 3rem; height: 3rem; }
-    </style>
-</head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analisador de Concorrência - MVP</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Inclui a biblioteca Chart.js para gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
-        /* ... seus estilos CSS existentes ... */
+        body { padding-top: 50px; background-color: #f8f9fa; font-family: 'Inter', sans-serif; }
+        .container { max-width: 900px; background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,.05); }
+        #loading { display: none; margin-top: 20px; }
+        #results { display: none; margin-top: 20px; }
+        #errorAlert { display: none; margin-top: 20px; }
+        .list-group-item { display: flex; justify-content: space-between; align-items: center; }
+        .spinner-border { width: 3rem; height: 3rem; }
+        .url-input-group { margin-bottom: 10px; }
+        .url-input-group:last-of-type .remove-url-btn { display: none; } /* Esconde o botão de remover do último campo */
+        .url-input-group:not(:first-of-type) .add-url-btn { display: none; } /* Esconde o botão de adicionar dos campos adicionados */
+        .chart-container { position: relative; height: 300px; width: 100%; margin-bottom: 20px; } /* Ajuste a altura conforme necessário */
+        .individual-result-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 20px; background-color: #fdfdfd; }
+        .comparison-section { margin-top: 40px; border-top: 2px solid #0d6efd; padding-top: 20px; }
+        .comparison-section h2 { color: #0d6efd; }
+        .comparison-section ul { list-style-type: none; padding-left: 0; }
+        .comparison-section ul li { background-color: #e9f5ff; border-radius: 5px; padding: 8px 12px; margin-bottom: 5px; display: inline-block; margin-right: 5px; font-weight: bold; color: #0d6efd;}
+        .unique-keywords-list li { background-color: #ffe9f5; color: #dc3545; }
+        .common-keywords-list li { background-color: #e9ffe9; color: #198754; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-4 text-center text-primary">Analisador de Concorrência (MVP)</h1>
-        <p class="text-center text-muted">Insira a URL de um concorrente para ver as palavras-chave mais usadas no conteúdo dele.</p>
+        <h1 class="mb-4 text-center text-primary">Analisador de Concorrência (Múltiplas URLs)</h1>
+        <p class="text-center text-muted">Insira as URLs dos concorrentes para comparar as palavras-chave mais usadas.</p>
         
-        <div class="input-group mb-3">
-            <input type="url" id="competitorUrl" class="form-control form-control-lg" placeholder="Ex: https://www.exemplo.com.br" required>
-            <button class="btn btn-primary btn-lg" id="analyzeButton">Analisar</button>
+        <!-- Área de input de URLs -->
+        <div id="urlInputsContainer">
+            <div class="input-group url-input-group">
+                <input type="url" class="form-control form-control-lg competitor-url-input" placeholder="Ex: https://www.exemplo.com.br" required>
+                <button class="btn btn-outline-secondary add-url-btn" type="button">Adicionar URL</button>
+                <button class="btn btn-outline-danger remove-url-btn" type="button" style="display: none;">Remover</button>
+            </div>
+        </div>
+        
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary btn-lg mt-3" id="analyzeButton">Analisar Todas</button>
         </div>
 
+        <!-- Indicador de carregamento -->
         <div id="loading" class="text-center" style="display: none;">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Carregando...</span>
             </div>
-            <p class="mt-2 text-muted">Analisando o site, por favor aguarde...</p>
+            <p class="mt-2 text-muted">Analisando os sites, por favor aguarde...</p>
         </div>
 
-        <div id="results" style="display: none;">
-            <h2 class="text-success">Resultados para: <span id="analyzedUrl" class="text-break"></span></h2>
+        <!-- Alerta para exibir mensagens de erro -->
+        <div id="errorAlert" class="alert alert-danger" role="alert" style="display: none;">
+            <!-- Mensagens de erro serão exibidas aqui via JavaScript -->
+        </div>
 
-            <div style="width: 100%; margin: auto; height: 400px;">
-                <canvas id="keywordsChart"></canvas>
+        <!-- Área para exibir os resultados da análise -->
+        <div id="results" style="display: none;">
+            <!-- Resultados Individuais de Cada URL -->
+            <h2 class="text-primary mb-4">Resultados Detalhados por URL:</h2>
+            <div id="individualResultsContainer">
+                <!-- Resultados de cada URL serão inseridos aqui -->
             </div>
 
-            <h3 class="mt-4">Palavras-chave Detalhadas:</h3>
-            <ul class="list-group" id="keywordsList">
+            <!-- Seção de Comparação -->
+            <div class="comparison-section">
+                <h2 class="mb-3">Comparação de Palavras-chave</h2>
+                
+                <h3 class="text-success">Palavras-chave Comuns a Todas as URLs:</h3>
+                <ul id="commonKeywordsList" class="common-keywords-list d-flex flex-wrap gap-2">
+                    <!-- Palavras-chave comuns serão inseridas aqui -->
                 </ul>
 
-            <div class="mt-3 text-center">
-                <button class="btn btn-success me-2" id="exportCsvButton" style="display: none;">Exportar para CSV</button>
-                <button class="btn btn-info" id="exportJsonButton" style="display: none;">Exportar para JSON</button>
-        </div>
-
-        <div id="errorAlert" class="alert alert-danger" role="alert" style="display: none;">
+                <h3 class="text-danger mt-4">Palavras-chave Únicas por URL:</h3>
+                <div id="uniqueKeywordsContainer">
+                    <!-- Palavras-chave únicas para cada URL serão inseridas aqui -->
+                </div>
             </div>
+        </div>
     </div>
 
-    </script> <script>
-        // Variável global (ou "quase" global, pois está dentro do DOMContentLoaded) para armazenar os dados.
-        // É importante que ela seja declarada FORA do listener do analyzeButton, mas dentro do DOMContentLoaded.
-        let lastAnalyzedKeywords = [];
+    <script>
+        // Variável global para armazenar os últimos dados de palavras-chave analisados
+        let lastAnalyzedData = null; // Agora armazenará a estrutura completa da resposta do backend
 
         document.addEventListener('DOMContentLoaded', function() {
             // Seleciona todos os elementos HTML que vamos manipular
-            const competitorUrlInput = document.getElementById('competitorUrl');
+            const urlInputsContainer = document.getElementById('urlInputsContainer');
             const analyzeButton = document.getElementById('analyzeButton');
             const loadingDiv = document.getElementById('loading');
             const resultsDiv = document.getElementById('results');
             const errorAlert = document.getElementById('errorAlert');
-            const keywordsList = document.getElementById('keywordsList');
-            const analyzedUrlSpan = document.getElementById('analyzedUrl');
-            const exportCsvButton = document.getElementById('exportCsvButton'); // Referência ao botão CSV
-            const exportJsonButton = document.getElementById('exportJsonButton'); // Referência ao botão JSON
+            const individualResultsContainer = document.getElementById('individualResultsContainer');
+            const commonKeywordsList = document.getElementById('commonKeywordsList');
+            const uniqueKeywordsContainer = document.getElementById('uniqueKeywordsContainer');
+
+            // Botões de exportação (inicialmente escondidos)
+            const exportCsvButton = document.getElementById('exportCsvButton'); // Este ID não existe mais no HTML, será criado dinamicamente se necessário
+            const exportJsonButton = document.getElementById('exportJsonButton'); // Este ID não existe mais no HTML, será criado dinamicamente se necessário
+
+            // Função para adicionar um novo campo de URL
+            function addUrlInputField() {
+                const newDiv = document.createElement('div');
+                newDiv.className = 'input-group url-input-group';
+                newDiv.innerHTML = `
+                    <input type="url" class="form-control form-control-lg competitor-url-input" placeholder="Ex: https://www.outro-exemplo.com.br" required>
+                    <button class="btn btn-outline-secondary add-url-btn" type="button" style="display: none;">Adicionar URL</button>
+                    <button class="btn btn-outline-danger remove-url-btn" type="button">Remover</button>
+                `;
+                urlInputsContainer.appendChild(newDiv);
+                attachInputListeners(newDiv); // Anexa listeners ao novo campo
+            }
+
+            // Função para anexar listeners aos botões de adicionar/remover URL
+            function attachInputListeners(container) {
+                const addBtn = container.querySelector('.add-url-btn');
+                const removeBtn = container.querySelector('.remove-url-btn');
+
+                if (addBtn) {
+                    addBtn.addEventListener('click', addUrlInputField);
+                }
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', function() {
+                        container.remove();
+                    });
+                }
+            }
+
+            // Anexa listeners ao campo de URL inicial
+            attachInputListeners(urlInputsContainer.querySelector('.url-input-group'));
 
 
             // --- Adiciona o "ouvinte de evento" ao botão de análise ---
             analyzeButton.addEventListener('click', async () => {
-                const url = competitorUrlInput.value.trim();
+                const urlInputs = document.querySelectorAll('.competitor-url-input');
+                const urls = Array.from(urlInputs)
+                                  .map(input => input.value.trim())
+                                  .filter(value => value !== ''); // Pega todas as URLs e filtra vazias
 
                 // --- Resetar o estado da interface ---
                 resultsDiv.style.display = 'none';
                 errorAlert.style.display = 'none';
-                keywordsList.innerHTML = ''; // Limpa a lista de palavras-chave
+                individualResultsContainer.innerHTML = ''; // Limpa resultados individuais
+                commonKeywordsList.innerHTML = ''; // Limpa lista de comuns
+                uniqueKeywordsContainer.innerHTML = ''; // Limpa lista de únicas
                 loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido no início
-                exportCsvButton.style.display = 'none'; // Esconde os botões de exportação
-                exportJsonButton.style.display = 'none'; // Esconde os botões de exportação
-
-                // --- Validação da URL (Aprimorada) ---
-                if (!url) {
-                    errorAlert.textContent = 'Por favor, insira uma URL para análise.';
+                
+                // --- Validação das URLs ---
+                if (urls.length === 0) {
+                    errorAlert.textContent = 'Por favor, insira pelo menos uma URL para análise.';
                     errorAlert.style.display = 'block';
-                    return; // Para a execução da função
+                    return;
                 }
 
                 const urlPattern = /^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/[a-zA-Z0-9]+\.[^\s]{2,}|[a-zA-Z0-9]+\.[^\s]{2,})$/i;
-
-                if (!urlPattern.test(url)) {
-                    errorAlert.textContent = 'Formato de URL inválido. Por favor, use "https://", "http://", ou um domínio válido como "www.site.com".';
-                    errorAlert.style.display = 'block';
-                    return; // Para a execução da função
+                for (let i = 0; i < urls.length; i++) {
+                    if (!urlPattern.test(urls[i])) {
+                        errorAlert.textContent = `Formato de URL inválido para "${urls[i]}". Por favor, use "https://", "http://", ou um domínio válido.`;
+                        errorAlert.style.display = 'block';
+                        return;
+                    }
                 }
 
                 // --- Iniciar o processo de análise ---
                 loadingDiv.style.display = 'block'; // Mostra o indicador de carregamento
 
                 try {
-                    // Faz a requisição POST para o backend (para a rota /analyze)
+                    // Faz a requisição POST para o backend com a LISTA de URLs
                     const response = await fetch('/analyze', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: url }),
+                        body: JSON.stringify({ urls: urls }), // Envia um objeto com a chave 'urls' e a lista
                     });
 
-                    const data = await response.json();
+                    const data = await response.json(); // A resposta agora tem 'individual_results' e 'comparison'
+                    lastAnalyzedData = data; // Armazena a resposta completa para exportação
 
-                    if (response.ok) { // Se a resposta HTTP for um sucesso (código 2xx)
-                        analyzedUrlSpan.textContent = data.url; // Exibe a URL analisada
-                        lastAnalyzedKeywords = data.top_keywords; // **ARMAZENA OS DADOS AQUI PARA EXPORTAÇÃO**
+                    if (response.ok) {
+                        // --- Exibir Resultados Individuais ---
+                        data.individual_results.forEach((result, index) => {
+                            const card = document.createElement('div');
+                            card.className = 'individual-result-card';
+                            card.innerHTML = `
+                                <h3 class="text-info">Análise para: <span class="text-break">${result.url}</span></h3>
+                            `;
 
-                        // Limpa o campo da URL
-                        competitorUrlInput.value = ''; //
+                            if (result.status === 'error') {
+                                card.innerHTML += `<p class="alert alert-warning">${result.message}</p>`;
+                            } else {
+                                // Container para o gráfico
+                                const chartId = `keywordsChart-${index}`;
+                                card.innerHTML += `
+                                    <div class="chart-container">
+                                        <canvas id="${chartId}"></canvas>
+                                    </div>
+                                    <h4 class="mt-3">Palavras-chave Detalhadas:</h4>
+                                    <ul class="list-group keywords-list-${index}"></ul>
+                                `;
+                                individualResultsContainer.appendChild(card);
 
-                        // --- Prepara os dados para o gráfico ---
-                        const labels = data.top_keywords.map(item => item[0]);
-                        const scores = data.top_keywords.map(item => item[1]);
+                                // Renderiza o gráfico
+                                const labels = result.top_keywords.map(item => item[0]);
+                                const scores = result.top_keywords.map(item => item[1]);
 
-                        // Destrói o gráfico anterior se ele existir para evitar sobreposição
-                        if (window.keywordsChartInstance) {
-                            window.keywordsChartInstance.destroy();
-                        }
-
-                        // Pega o contexto do canvas para desenhar o gráfico
-                        const ctx = document.getElementById('keywordsChart').getContext('2d');
-
-                        // Cria o novo gráfico de barras
-                        window.keywordsChartInstance = new Chart(ctx, {
-                            type: 'bar',
-                            data: {
-                                labels: labels,
-                                datasets: [{
-                                    label: 'Score TF-IDF',
-                                    data: scores,
-                                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                                    borderColor: 'rgba(54, 162, 235, 1)',
-                                    borderWidth: 1
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                indexAxis: 'y',
-                                plugins: {
-                                    legend: { display: false },
-                                    tooltip: {
-                                        callbacks: {
-                                            label: function(context) {
-                                                let label = context.dataset.label || '';
-                                                if (label) { label += ': '; }
-                                                if (context.parsed.x !== null) { label += context.parsed.x.toFixed(4); }
-                                                return label;
+                                const ctx = document.getElementById(chartId).getContext('2d');
+                                new Chart(ctx, { // Não precisamos de window.keywordsChartInstance aqui, pois cada gráfico é único
+                                    type: 'bar',
+                                    data: {
+                                        labels: labels,
+                                        datasets: [{
+                                            label: 'Score TF-IDF',
+                                            data: scores,
+                                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                                            borderColor: 'rgba(54, 162, 235, 1)',
+                                            borderWidth: 1
+                                        }]
+                                    },
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        indexAxis: 'y',
+                                        plugins: {
+                                            legend: { display: false },
+                                            tooltip: {
+                                                callbacks: {
+                                                    label: function(context) {
+                                                        let label = context.dataset.label || '';
+                                                        if (label) { label += ': '; }
+                                                        if (context.parsed.x !== null) { label += context.parsed.x.toFixed(4); }
+                                                        return label;
+                                                    }
+                                                }
                                             }
+                                        },
+                                        scales: {
+                                            x: { beginAtZero: true, title: { display: true, text: 'Score TF-IDF' } },
+                                            y: { title: { display: true, text: 'Palavra-chave' } }
                                         }
                                     }
-                                },
-                                scales: {
-                                    x: {
-                                        beginAtZero: true,
-                                        title: { display: true, text: 'Score TF-IDF' }
-                                    },
-                                    y: {
-                                        title: { display: true, text: 'Palavra-chave' }
-                                    }
-                                }
+                                });
+
+                                // Preenche a lista detalhada
+                                const currentKeywordsList = card.querySelector(`.keywords-list-${index}`);
+                                result.top_keywords.forEach(item => {
+                                    const li = document.createElement('li');
+                                    li.className = 'list-group-item';
+                                    li.innerHTML = `<strong>${item[0]}</strong> <span class="badge bg-secondary rounded-pill">${item[1].toFixed(4)}</span>`;
+                                    currentKeywordsList.appendChild(li);
+                                });
                             }
+                            individualResultsContainer.appendChild(card); // Adiciona o card ao container principal
                         });
 
-                        // --- Ainda exibe a lista detalhada abaixo do gráfico ---
-                        keywordsList.innerHTML = ''; // Limpa a lista antes de adicionar novos itens
-                        data.top_keywords.forEach(item => {
+                        // --- Exibir Palavras-chave Comuns ---
+                        data.comparison.common_keywords.forEach(keyword => {
                             const li = document.createElement('li');
-                            li.className = 'list-group-item';
-                            li.innerHTML = `<strong>${item[0]}</strong> <span class="badge bg-secondary rounded-pill">${item[1].toFixed(4)}</span>`;
-                            keywordsList.appendChild(li);
+                            li.textContent = keyword;
+                            commonKeywordsList.appendChild(li);
+                        });
+                        if (data.comparison.common_keywords.length === 0) {
+                            commonKeywordsList.innerHTML = '<li class="text-muted">Nenhuma palavra-chave comum encontrada.</li>';
+                        }
+
+                        // --- Exibir Palavras-chave Únicas por URL ---
+                        data.comparison.unique_keywords_per_url.forEach(url_unique => {
+                            const uniqueCard = document.createElement('div');
+                            uniqueCard.className = 'card mb-2';
+                            uniqueCard.innerHTML = `
+                                <div class="card-header bg-light">Palavras Únicas para: <span class="text-break">${url_unique.url}</span></div>
+                                <div class="card-body">
+                                    <ul class="unique-keywords-list d-flex flex-wrap gap-2"></ul>
+                                </div>
+                            `;
+                            const uniqueList = uniqueCard.querySelector('ul');
+                            if (url_unique.keywords.length === 0) {
+                                uniqueList.innerHTML = '<li class="text-muted">Nenhuma palavra-chave única encontrada.</li>';
+                            } else {
+                                url_unique.keywords.forEach(keyword => {
+                                    const li = document.createElement('li');
+                                    li.textContent = keyword;
+                                    uniqueList.appendChild(li);
+                                });
+                            }
+                            uniqueKeywordsContainer.appendChild(uniqueCard);
                         });
 
-                        // Mostra a área de resultados e os botões de exportação
-                        resultsDiv.style.display = 'block';
-                        exportCsvButton.style.display = 'inline-block'; // Mostra o botão CSV
-                        exportJsonButton.style.display = 'inline-block'; // Mostra o botão JSON
+                        resultsDiv.style.display = 'block'; // Mostra a área de resultados principal
 
                     } else { // Se a resposta do backend for um erro (código 4xx ou 5xx)
-                        errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar a URL.';
+                        errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar as URLs.';
                         errorAlert.style.display = 'block';
-                        // Esconde os botões de exportação em caso de erro
-                        exportCsvButton.style.display = 'none';
-                        exportJsonButton.style.display = 'none';
                     }
                 } catch (error) { // Captura erros de rede
                     errorAlert.textContent = `Erro de conexão ou problema inesperado: ${error.message}. Verifique se o backend está rodando.`;
                     errorAlert.style.display = 'block';
-                    // Esconde os botões de exportação em caso de erro
-                    exportCsvButton.style.display = 'none';
-                    exportJsonButton.style.display = 'none';
                 } finally {
                     loadingDiv.style.display = 'none'; // Sempre esconde o indicador de carregamento no final
                 }
@@ -216,25 +307,49 @@
 
             // ***************************************************************
             // FUNÇÕES DE EXPORTAÇÃO E LISTENERS DE EVENTO PARA ELAS
-            // ESTÃO AQUI FORA DO analyzeButton.addEventListener
+            // (Agora usam lastAnalyzedData)
             // ***************************************************************
 
             // Função para exportar para CSV
             function exportToCsv() {
-                if (lastAnalyzedKeywords.length === 0) {
+                if (!lastAnalyzedData) {
                     alert('Nenhum dado para exportar.');
                     return;
                 }
-                let csvContent = "Palavra-chave,Score TF-IDF\n";
-                lastAnalyzedKeywords.forEach(item => {
-                    const score = typeof item[1] === 'number' ? item[1].toFixed(4) : item[1];
-                    const keyword = `"${item[0].replace(/"/g, '""')}"`;
-                    csvContent += `${keyword},${score}\n`;
+
+                let csvContent = "Tipo,URL,Palavra-chave,Score TF-IDF\n";
+
+                // Adiciona resultados individuais
+                lastAnalyzedData.individual_results.forEach(result => {
+                    if (result.status === 'success') {
+                        result.top_keywords.forEach(item => {
+                            const score = typeof item[1] === 'number' ? item[1].toFixed(4) : item[1];
+                            const keyword = `"${item[0].replace(/"/g, '""')}"`;
+                            csvContent += `Individual,"${result.url}",${keyword},${score}\n`;
+                        });
+                    }
                 });
+
+                // Adiciona palavras-chave comuns
+                if (lastAnalyAnalyzedData.comparison.common_keywords.length > 0) {
+                    lastAnalyzedData.comparison.common_keywords.forEach(keyword => {
+                        const escapedKeyword = `"${keyword.replace(/"/g, '""')}"`;
+                        csvContent += `Comum,,${escapedKeyword},\n`; // Sem score para comum
+                    });
+                }
+
+                // Adiciona palavras-chave únicas
+                lastAnalyzedData.comparison.unique_keywords_per_url.forEach(unique_item => {
+                    unique_item.keywords.forEach(keyword => {
+                        const escapedKeyword = `"${keyword.replace(/"/g, '""')}"`;
+                        csvContent += `Única,"${unique_item.url}",${escapedKeyword},\n`; // Sem score para única
+                    });
+                });
+
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.setAttribute('download', 'palavras_chave_analise.csv');
+                link.setAttribute('download', 'analise_concorrencia.csv');
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -242,28 +357,77 @@
 
             // Função para exportar para JSON
             function exportToJson() {
-                if (lastAnalyzedKeywords.length === 0) {
+                if (!lastAnalyzedData) {
                     alert('Nenhum dado para exportar.');
                     return;
                 }
-                const jsonData = lastAnalyzedKeywords.map(item => ({
-                    "palavra_chave": item[0],
-                    "score_tf_idf": parseFloat(item[1].toFixed(4))
-                }));
-                const jsonContent = JSON.stringify(jsonData, null, 2);
+                const jsonContent = JSON.stringify(lastAnalyzedData, null, 2);
                 const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.setAttribute('download', 'palavras_chave_analise.json');
+                link.setAttribute('download', 'analise_concorrencia.json');
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
             }
 
-            // Adiciona os ouvintes de evento aos botões de exportação
-            exportCsvButton.addEventListener('click', exportToCsv);
-            exportJsonButton.addEventListener('click', exportToJson);
+            // Adiciona os ouvintes de evento aos botões de exportação (criados dinamicamente)
+            // Estes botões serão adicionados ao DOM junto com os resultados, então seus listeners
+            // precisarão ser anexados de forma diferente ou os botões de exportação precisam ser fixos.
+            // Para simplicidade, vamos manter os botões de exportação fixos e visíveis quando há resultados.
+            // Removi os IDs 'exportCsvButton' e 'exportJsonButton' do HTML principal,
+            // então vamos adicioná-los de volta como botões fixos no final da seção de resultados.
+            
+            // Adicione um container para os botões de exportação no HTML, se ainda não tiver:
+            // <div class="mt-3 text-center" id="exportButtonsContainer" style="display: none;">
+            //     <button class="btn btn-success me-2" id="exportCsvButton">Exportar para CSV</button>
+            //     <button class="btn btn-info" id="exportJsonButton">Exportar para JSON</button>
+            // </div>
+            // E então, no JS, selecione-os e adicione os listeners:
 
+            // Seleciona os botões de exportação que estarão fixos no HTML
+            const exportButtonsContainer = document.createElement('div');
+            exportButtonsContainer.className = 'mt-3 text-center';
+            exportButtonsContainer.id = 'exportButtonsContainer';
+            exportButtonsContainer.style.display = 'none'; // Escondido por padrão
+            exportButtonsContainer.innerHTML = `
+                <button class="btn btn-success me-2" id="exportCsvButton">Exportar para CSV</button>
+                <button class="btn btn-info" id="exportJsonButton">Exportar para JSON</button>
+            `;
+            resultsDiv.appendChild(exportButtonsContainer); // Adiciona ao final da div de resultados
+
+            const fixedExportCsvButton = document.getElementById('exportCsvButton');
+            const fixedExportJsonButton = document.getElementById('exportJsonButton');
+
+            fixedExportCsvButton.addEventListener('click', exportToCsv);
+            fixedExportJsonButton.addEventListener('click', exportToJson);
+
+            // Ajuste no analyzeButton.addEventListener para mostrar/esconder o container de botões
+            // Onde você tem:
+            // exportCsvButton.style.display = 'inline-block';
+            // exportJsonButton.style.display = 'inline-block';
+            // Substitua por:
+            // fixedExportButtonsContainer.style.display = 'block';
+
+            // E onde você esconde:
+            // exportCsvButton.style.display = 'none';
+            // exportJsonButton.style.display = 'none';
+            // Substitua por:
+            // fixedExportButtonsContainer.style.display = 'none';
+
+
+            // Ajuste final no analyzeButton.addEventListener para mostrar/esconder o container de botões
+            // Dentro de if (response.ok) { ... }
+            // Adicione:
+            // fixedExportButtonsContainer.style.display = 'block';
+
+            // Dentro de else { ... } e catch (error) { ... }
+            // Adicione:
+            // fixedExportButtonsContainer.style.display = 'none';
+
+            // E no início do analyzeButton.addEventListener, para resetar:
+            // fixedExportButtonsContainer.style.display = 'none';
+            
         }); // Fim do document.addEventListener('DOMContentLoaded', function() {
     </script>
 </body>
