@@ -9,24 +9,93 @@
     <!-- Inclui a biblioteca Chart.js para gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
-        body { padding-top: 50px; background-color: #f8f9fa; font-family: 'Inter', sans-serif; }
-        .container { max-width: 900px; background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,.05); }
-        #loading { display: none; margin-top: 20px; }
-        #results { display: none; margin-top: 20px; }
-        #errorAlert { display: none; margin-top: 20px; }
-        .list-group-item { display: flex; justify-content: space-between; align-items: center; }
-        .spinner-border { width: 3rem; height: 3rem; }
-        .url-input-group { margin-bottom: 10px; }
-        .url-input-group:last-of-type .remove-url-btn { display: none; } /* Esconde o botão de remover do último campo */
-        .url-input-group:not(:first-of-type) .add-url-btn { display: none; } /* Esconde o botão de adicionar dos campos adicionados */
-        .chart-container { position: relative; height: 300px; width: 100%; margin-bottom: 20px; } /* Ajuste a altura conforme necessário */
-        .individual-result-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 20px; background-color: #fdfdfd; }
-        .comparison-section { margin-top: 40px; border-top: 2px solid #0d6efd; padding-top: 20px; }
-        .comparison-section h2 { color: #0d6efd; }
-        .comparison-section ul { list-style-type: none; padding-left: 0; }
-        .comparison-section ul li { background-color: #e9f5ff; border-radius: 5px; padding: 8px 12px; margin-bottom: 5px; display: inline-block; margin-right: 5px; font-weight: bold; color: #0d6efd;}
-        .unique-keywords-list li { background-color: #ffe9f5; color: #dc3545; }
-        .common-keywords-list li { background-color: #e9ffe9; color: #198754; }
+        body { 
+            padding-top: 50px; 
+            background-color: #f8f9fa; 
+            font-family: 'Inter', sans-serif; 
+        }
+        .container { 
+            max-width: 900px; 
+            background-color: #fff; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,.05); 
+        }
+        #loading { 
+            display: none; 
+            margin-top: 20px; 
+        }
+        #results { 
+            display: none; 
+            margin-top: 20px; 
+        }
+        #errorAlert { 
+            display: none; 
+            margin-top: 20px; 
+        }
+        .list-group-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .spinner-border { 
+            width: 3rem; 
+            height: 3rem; 
+        }
+        .url-input-group { 
+            margin-bottom: 10px; 
+        }
+        /* Esconde o botão de remover do primeiro campo de URL */
+        .url-input-group:first-of-type .remove-url-btn { 
+            display: none; 
+        } 
+        /* Esconde o botão de adicionar dos campos de URL adicionados dinamicamente */
+        .url-input-group:not(:first-of-type) .add-url-btn { 
+            display: none; 
+        } 
+        .chart-container { 
+            position: relative; 
+            height: 300px; 
+            width: 100%; 
+            margin-bottom: 20px; 
+        }
+        .individual-result-card { 
+            border: 1px solid #e0e0e0; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin-bottom: 20px; 
+            background-color: #fdfdfd; 
+        }
+        .comparison-section { 
+            margin-top: 40px; 
+            border-top: 2px solid #0d6efd; 
+            padding-top: 20px; 
+        }
+        .comparison-section h2 { 
+            color: #0d6efd; 
+        }
+        .comparison-section ul { 
+            list-style-type: none; 
+            padding-left: 0; 
+        }
+        .comparison-section ul li { 
+            background-color: #e9f5ff; 
+            border-radius: 5px; 
+            padding: 8px 12px; 
+            margin-bottom: 5px; 
+            display: inline-block; 
+            margin-right: 5px; 
+            font-weight: bold; 
+            color: #0d6efd;
+        }
+        .unique-keywords-list li { 
+            background-color: #ffe9f5; 
+            color: #dc3545; 
+        }
+        .common-keywords-list li { 
+            background-color: #e9ffe9; 
+            color: #198754; 
+        }
     </style>
 </head>
 <body>
@@ -34,12 +103,18 @@
         <h1 class="mb-4 text-center text-primary">Analisador de Concorrência (Múltiplas URLs)</h1>
         <p class="text-center text-muted">Insira as URLs dos concorrentes para comparar as palavras-chave mais usadas.</p>
         
-        <!-- Área de input de URLs -->
+        <!-- Área de input de URLs - AGORA COM VALIDAÇÃO VISUAL -->
         <div id="urlInputsContainer">
-            <div class="input-group url-input-group">
+            <div class="input-group url-input-group has-validation"> 
                 <input type="url" class="form-control form-control-lg competitor-url-input" placeholder="Ex: https://www.exemplo.com.br" required>
                 <button class="btn btn-outline-secondary add-url-btn" type="button">Adicionar URL</button>
-                <button class="btn btn-outline-danger remove-url-btn" type="button" style="display: none;">Remover</button>
+                <button class="btn btn-outline-danger remove-url-btn" type="button">Remover</button>
+                <div class="invalid-feedback">
+                    Por favor, insira uma URL válida (ex: https://www.site.com).
+                </div>
+                <div class="valid-feedback">
+                    URL válida!
+                </div>
             </div>
         </div>
         
@@ -47,7 +122,7 @@
             <button class="btn btn-primary btn-lg mt-3" id="analyzeButton">Analisar Todas</button>
         </div>
 
-        <!-- Indicador de carregamento -->
+        <!-- Indicador de carregamento (inicialmente escondido) -->
         <div id="loading" class="text-center" style="display: none;">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Carregando...</span>
@@ -55,12 +130,12 @@
             <p class="mt-2 text-muted">Analisando os sites, por favor aguarde...</p>
         </div>
 
-        <!-- Alerta para exibir mensagens de erro -->
+        <!-- Alerta para exibir mensagens de erro (inicialmente escondido) -->
         <div id="errorAlert" class="alert alert-danger" role="alert" style="display: none;">
             <!-- Mensagens de erro serão exibidas aqui via JavaScript -->
         </div>
 
-        <!-- Área para exibir os resultados da análise -->
+        <!-- Área para exibir os resultados da análise (inicialmente escondida) -->
         <div id="results" style="display: none;">
             <!-- Resultados Individuais de Cada URL -->
             <h2 class="text-primary mb-4">Resultados Detalhados por URL:</h2>
@@ -85,8 +160,13 @@
         </div>
     </div>
 
+    <!-- Scripts do Bootstrap (se estiver usando JS deles) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Seu script JavaScript personalizado -->
     <script>
-        // Variável global para armazenar os últimos dados de palavras-chave analisados
+        // Variável global (ou "quase" global, pois está dentro do DOMContentLoaded) para armazenar os dados.
+        // É importante que ela seja declarada FORA do listener do analyzeButton, mas dentro do DOMContentLoaded.
         let lastAnalyzedData = null; // Agora armazenará a estrutura completa da resposta do backend
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -100,27 +180,68 @@
             const commonKeywordsList = document.getElementById('commonKeywordsList');
             const uniqueKeywordsContainer = document.getElementById('uniqueKeywordsContainer');
 
-            // Botões de exportação (inicialmente escondidos)
-            const exportCsvButton = document.getElementById('exportCsvButton'); // Este ID não existe mais no HTML, será criado dinamicamente se necessário
-            const exportJsonButton = document.getElementById('exportJsonButton'); // Este ID não existe mais no HTML, será criado dinamicamente se necessário
+            // Seleciona os botões de exportação que estarão fixos no HTML
+            // (Estes botões são adicionados dinamicamente ao resultsDiv no final do script)
+            const exportButtonsContainer = document.createElement('div');
+            exportButtonsContainer.className = 'mt-3 text-center';
+            exportButtonsContainer.id = 'exportButtonsContainer';
+            exportButtonsContainer.style.display = 'none'; // Escondido por padrão
+            exportButtonsContainer.innerHTML = `
+                <button class="btn btn-success me-2" id="exportCsvButton">Exportar para CSV</button>
+                <button class="btn btn-info" id="exportJsonButton">Exportar para JSON</button>
+            `;
+            resultsDiv.appendChild(exportButtonsContainer); // Adiciona ao final da div de resultados
+
+            const fixedExportCsvButton = document.getElementById('exportCsvButton');
+            const fixedExportJsonButton = document.getElementById('exportJsonButton');
+
+
+            // --- FUNÇÕES AUXILIARES PARA GERENCIAR CAMPOS DE URL E VALIDAÇÃO ---
+
+            // Expressão regular para uma validação de URL mais robusta
+            const urlPattern = /^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/[a-zA-Z0-9]+\.[^\s]{2,}|[a-zA-Z0-9]+\.[^\s]{2,})$/i;
+
+            // Função para validar um único campo de URL e aplicar classes Bootstrap
+            function validateUrlInput(inputElement) {
+                const url = inputElement.value.trim();
+                if (url === '') {
+                    inputElement.classList.remove('is-valid', 'is-invalid'); // Remove validação se estiver vazio
+                    return true; // Considera vazio como "não validado ainda", não "inválido"
+                } else if (urlPattern.test(url)) {
+                    inputElement.classList.add('is-valid');
+                    inputElement.classList.remove('is-invalid');
+                    return true;
+                } else {
+                    inputElement.classList.add('is-invalid');
+                    inputElement.classList.remove('is-valid');
+                    return false;
+                }
+            }
 
             // Função para adicionar um novo campo de URL
             function addUrlInputField() {
                 const newDiv = document.createElement('div');
-                newDiv.className = 'input-group url-input-group';
+                newDiv.className = 'input-group url-input-group has-validation'; // Adicionado has-validation
                 newDiv.innerHTML = `
                     <input type="url" class="form-control form-control-lg competitor-url-input" placeholder="Ex: https://www.outro-exemplo.com.br" required>
                     <button class="btn btn-outline-secondary add-url-btn" type="button" style="display: none;">Adicionar URL</button>
                     <button class="btn btn-outline-danger remove-url-btn" type="button">Remover</button>
+                    <div class="invalid-feedback">
+                        Por favor, insira uma URL válida (ex: https://www.site.com).
+                    </div>
+                    <div class="valid-feedback">
+                        URL válida!
+                    </div>
                 `;
                 urlInputsContainer.appendChild(newDiv);
                 attachInputListeners(newDiv); // Anexa listeners ao novo campo
             }
 
-            // Função para anexar listeners aos botões de adicionar/remover URL
+            // Função para anexar listeners aos botões de adicionar/remover URL e ao input para validação em tempo real
             function attachInputListeners(container) {
                 const addBtn = container.querySelector('.add-url-btn');
                 const removeBtn = container.querySelector('.remove-url-btn');
+                const urlInput = container.querySelector('.competitor-url-input'); // Pega o input de URL dentro deste container
 
                 if (addBtn) {
                     addBtn.addEventListener('click', addUrlInputField);
@@ -130,9 +251,15 @@
                         container.remove();
                     });
                 }
+                // ADICIONADO: Listener para validação em tempo real enquanto o usuário digita
+                if (urlInput) {
+                    urlInput.addEventListener('input', () => {
+                        validateUrlInput(urlInput);
+                    });
+                }
             }
 
-            // Anexa listeners ao campo de URL inicial
+            // Anexa listeners ao campo de URL inicial (que já existe no HTML)
             attachInputListeners(urlInputsContainer.querySelector('.url-input-group'));
 
 
@@ -150,21 +277,27 @@
                 commonKeywordsList.innerHTML = ''; // Limpa lista de comuns
                 uniqueKeywordsContainer.innerHTML = ''; // Limpa lista de únicas
                 loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido no início
-                
-                // --- Validação das URLs ---
+                exportButtonsContainer.style.display = 'none'; // Esconde os botões de exportação
+
+                // --- Validação das URLs (Ajustada para validação em tempo real) ---
                 if (urls.length === 0) {
                     errorAlert.textContent = 'Por favor, insira pelo menos uma URL para análise.';
                     errorAlert.style.display = 'block';
                     return;
                 }
 
-                const urlPattern = /^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/[a-zA-Z0-9]+\.[^\s]{2,}|[a-zA-Z0-9]+\.[^\s]{2,})$/i;
-                for (let i = 0; i < urls.length; i++) {
-                    if (!urlPattern.test(urls[i])) {
-                        errorAlert.textContent = `Formato de URL inválido para "${urls[i]}". Por favor, use "https://", "http://", ou um domínio válido.`;
-                        errorAlert.style.display = 'block';
-                        return;
+                let allUrlsValid = true;
+                const allUrlInputs = document.querySelectorAll('.competitor-url-input'); // Seleciona todos os inputs novamente
+                allUrlInputs.forEach(inputElement => {
+                    if (!validateUrlInput(inputElement)) { // Valida cada input e verifica se algum é inválido
+                        allUrlsValid = false;
                     }
+                });
+
+                if (!allUrlsValid) {
+                    errorAlert.textContent = 'Por favor, corrija as URLs inválidas antes de analisar.';
+                    errorAlert.style.display = 'block';
+                    return;
                 }
 
                 // --- Iniciar o processo de análise ---
@@ -182,6 +315,9 @@
                     lastAnalyzedData = data; // Armazena a resposta completa para exportação
 
                     if (response.ok) {
+                        // Limpa o campo da URL (opcional, se quiser limpar todos os campos após a análise)
+                        // urlInputs.forEach(input => input.value = ''); // Descomente se quiser limpar todos os campos
+
                         // --- Exibir Resultados Individuais ---
                         data.individual_results.forEach((result, index) => {
                             const card = document.createElement('div');
@@ -291,14 +427,17 @@
                         });
 
                         resultsDiv.style.display = 'block'; // Mostra a área de resultados principal
+                        exportButtonsContainer.style.display = 'block'; // Mostra os botões de exportação
 
                     } else { // Se a resposta do backend for um erro (código 4xx ou 5xx)
                         errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar as URLs.';
                         errorAlert.style.display = 'block';
+                        exportButtonsContainer.style.display = 'none'; // Esconde os botões de exportação
                     }
                 } catch (error) { // Captura erros de rede
                     errorAlert.textContent = `Erro de conexão ou problema inesperado: ${error.message}. Verifique se o backend está rodando.`;
                     errorAlert.style.display = 'block';
+                    exportButtonsContainer.style.display = 'none'; // Esconde os botões de exportação
                 } finally {
                     loadingDiv.style.display = 'none'; // Sempre esconde o indicador de carregamento no final
                 }
@@ -307,7 +446,6 @@
 
             // ***************************************************************
             // FUNÇÕES DE EXPORTAÇÃO E LISTENERS DE EVENTO PARA ELAS
-            // (Agora usam lastAnalyzedData)
             // ***************************************************************
 
             // Função para exportar para CSV
@@ -331,7 +469,7 @@
                 });
 
                 // Adiciona palavras-chave comuns
-                if (lastAnalyAnalyzedData.comparison.common_keywords.length > 0) {
+                if (lastAnalyzedData.comparison.common_keywords.length > 0) {
                     lastAnalyzedData.comparison.common_keywords.forEach(keyword => {
                         const escapedKeyword = `"${keyword.replace(/"/g, '""')}"`;
                         csvContent += `Comum,,${escapedKeyword},\n`; // Sem score para comum
@@ -371,63 +509,10 @@
                 document.body.removeChild(link);
             }
 
-            // Adiciona os ouvintes de evento aos botões de exportação (criados dinamicamente)
-            // Estes botões serão adicionados ao DOM junto com os resultados, então seus listeners
-            // precisarão ser anexados de forma diferente ou os botões de exportação precisam ser fixos.
-            // Para simplicidade, vamos manter os botões de exportação fixos e visíveis quando há resultados.
-            // Removi os IDs 'exportCsvButton' e 'exportJsonButton' do HTML principal,
-            // então vamos adicioná-los de volta como botões fixos no final da seção de resultados.
-            
-            // Adicione um container para os botões de exportação no HTML, se ainda não tiver:
-            // <div class="mt-3 text-center" id="exportButtonsContainer" style="display: none;">
-            //     <button class="btn btn-success me-2" id="exportCsvButton">Exportar para CSV</button>
-            //     <button class="btn btn-info" id="exportJsonButton">Exportar para JSON</button>
-            // </div>
-            // E então, no JS, selecione-os e adicione os listeners:
-
-            // Seleciona os botões de exportação que estarão fixos no HTML
-            const exportButtonsContainer = document.createElement('div');
-            exportButtonsContainer.className = 'mt-3 text-center';
-            exportButtonsContainer.id = 'exportButtonsContainer';
-            exportButtonsContainer.style.display = 'none'; // Escondido por padrão
-            exportButtonsContainer.innerHTML = `
-                <button class="btn btn-success me-2" id="exportCsvButton">Exportar para CSV</button>
-                <button class="btn btn-info" id="exportJsonButton">Exportar para JSON</button>
-            `;
-            resultsDiv.appendChild(exportButtonsContainer); // Adiciona ao final da div de resultados
-
-            const fixedExportCsvButton = document.getElementById('exportCsvButton');
-            const fixedExportJsonButton = document.getElementById('exportJsonButton');
-
+            // Adiciona os ouvintes de evento aos botões de exportação
             fixedExportCsvButton.addEventListener('click', exportToCsv);
             fixedExportJsonButton.addEventListener('click', exportToJson);
 
-            // Ajuste no analyzeButton.addEventListener para mostrar/esconder o container de botões
-            // Onde você tem:
-            // exportCsvButton.style.display = 'inline-block';
-            // exportJsonButton.style.display = 'inline-block';
-            // Substitua por:
-            // fixedExportButtonsContainer.style.display = 'block';
-
-            // E onde você esconde:
-            // exportCsvButton.style.display = 'none';
-            // exportJsonButton.style.display = 'none';
-            // Substitua por:
-            // fixedExportButtonsContainer.style.display = 'none';
-
-
-            // Ajuste final no analyzeButton.addEventListener para mostrar/esconder o container de botões
-            // Dentro de if (response.ok) { ... }
-            // Adicione:
-            // fixedExportButtonsContainer.style.display = 'block';
-
-            // Dentro de else { ... } e catch (error) { ... }
-            // Adicione:
-            // fixedExportButtonsContainer.style.display = 'none';
-
-            // E no início do analyzeButton.addEventListener, para resetar:
-            // fixedExportButtonsContainer.style.display = 'none';
-            
         }); // Fim do document.addEventListener('DOMContentLoaded', function() {
     </script>
 </body>
