@@ -16,22 +16,7 @@ DetectorFactory.seed = 0
 app = Flask(__name__)
 
 # --- Configuração do Firebase Admin SDK ---
-# COLE O CONTEÚDO DO SEU ARQUIVO JSON DE CREDENCIAIS DO FIREBASE AQUI
-# EX: FIREBASE_SERVICE_ACCOUNT_CONFIG = { "type": "service_account", "project_id": "...", "private_key_id": "...", ... }
-# Certifique-se de que as aspas duplas e o formato JSON estejam corretos.
-FIREBASE_SERVICE_ACCOUNT_CONFIG = {
-  "type": "service_account",
-  "project_id": "analisador-console",
-  "private_key_id": "794709bbc9d73e0c71284d89e49de8c7f4245b89",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDOqznxuxG1Vdr8\nOS031Xdimxj2XI/oJl3vCF5d0ggNxN2OU3N7+EYjL9iHto/X8RJcE+cz2wD+n8Cl\nnURqD/dU3tEdt9uxpqonmoaUajtup+gUWFUAONdjN7JPrFWJvewjt4x+ndHeRugi\nepNsg+WQRtLQgkS6eYjR/RKtJg0oPotLR7rJCHxol8I4hvmTgZWJYKulNAxtDU+l\nFdl8l8RHmxQrUR84rLGHwmOMZBm+M161N51jZvjWDmwfsq56flPEkUsF9Zc3SjZS\n5RpaanxOvy/UMw7PlxRKURbxAVTS+6ael98/1skRbEqTPZcAygr4MJtsRqYzGKW+\nBrqKG8dfAgMBAAECggEAATDATTGoKPS9Ja3IomUy4lkFXEntNEegS+Ou83hlvnqP\nUiYN6L1l3gcFBscY7gP/+JLOxqAw0camy+1revbrlEwSRUsNU2kj2sWLl+hCvmDu\nN8vIdY9eQj6MYuQZvAjhhtUkVIhhMJgU9znghoP9+wZFaZkOf0p67Ma56FBrS/uJ\nmCRjdb0CwR3pEv9m72ShnbhGjsi9wWN/pfhIrwdx28C87xPF0oRhpqSD4qlgPWGN\nUaz4vFMkYF9B+aBXxuUCLSLjTcMNV9IElzAWqzTDBocoeu/OaPzNL9C9E8qRubmD\n9hzuVPySLtE194Q9sznVj+XFtdRFrdKl8nOkePa7UQKBgQDtnJI7uZOyUasZkb9K\nMN9aj9yuKW/XbjgIMDbXN+IdAMGgmAPR4MWqER4i2DNA0avDCJ61y84622bpnhoc\n1MSK3HS++4iLymMHquWWpLqV5kBo2L7C0EI5uE1+7shyYOYwCdyCAHg6Kvr+WcYD\nDibNMuxHg5bN1NwEBNYX/J24bwKBgQDeqaJwZOwl5Epz0YTu7kljFhI2aDyNEPiE\ngtGuTh3TOOHNN0XpHszOe51zyLJwp4ADRq2l8zquthIVEHgVYrwcOG2gSJLzGT8Q\nAAkbE1F7EI0DRdsjyZ1MFJuSOWRGRddJZax7exypw0BHUsGwHP+c5JLrZ9niedGk\nB3SAO/n4EQKBgQCzCFoWrkle/rIQ3gRn/lMMhYEdqRMgG2gUo19u4ih4+ezq+B9I\nsDe/YI54araTjGgC2Cfdiuak6lOsivfZ6Wb9ygYdMKE90wyy5k1/KDd+YrL9TPLP\nDuQXYYrirUBTDjfi0ktXmMr96QydQT81ZiBOVKQ7bibeiBgO3yYBhNHB+QKBgHm8\ndyJKG05QNWCDIdHcF+WDsKtsbAaYS7dvKqLI9MeB5vpjCOb+vuz5asld5ilveq7P\n2qrLg773roUzvuO6Wqx3MYCbjTQ6Dl96FYBnHHpTPzWV4Mz9MvHgpnnYxPkiwCTR\n4O6WDcLHDIKyPVFDWYF2+tiXq+mFvteWd9yQbgdxAoGAZeXLZ1kOFmy+e0nXNSTP\n8lmYxwIOXYPt+/B1u9swQcfz9c67lRQQXnL00UGVgFaQxGAVMKv86Onf+t6PRXXn\nQykAOEPbKYyFdg3lW/ldJTPDKbCvvfFaO0PUfG/acmhQkv7pAge3Si7+viQIo0ws\n+Fgz8SIROIv5FBDGDLLkazk=\n-----END PRIVATE KEY-----\n",
-  "client_email": "firebase-adminsdk-fbsvc@analisador-console.iam.gserviceaccount.com",
-  "client_id": "105863656371147668503",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40analisador-console.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
+FIREBASE_SERVICE_ACCOUNT_CONFIG = None # OU {} (um dicionário vazio)
 
 # Inicializa o Firebase Admin SDK
 try:
