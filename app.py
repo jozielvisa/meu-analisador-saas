@@ -6,9 +6,10 @@ import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from langdetect import detect, DetectorFactory
 import firebase_admin
-from firebase_admin import credentials, auth
-from dotenv import load_dotenv
-load_dotenv() # Carrega as variáveis do .env
+from firebase_admin import credentials, auth, firestore # Importa firestore
+import os
+import json
+from datetime import datetime, timedelta, timezone # Para gerenciar datas e limites
 
 # Garante que a detecção de idioma seja consistente
 DetectorFactory.seed = 0
@@ -16,17 +17,32 @@ DetectorFactory.seed = 0
 app = Flask(__name__)
 
 # --- Configuração do Firebase Admin SDK ---
-FIREBASE_SERVICE_ACCOUNT_CONFIG = None # OU {} (um dicionário vazio)
-
-# Inicializa o Firebase Admin SDK
+FIREBASE_SERVICE_ACCOUNT_CONFIG = None
 try:
-    cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_CONFIG)
-    firebase_admin.initialize_app(cred)
-    print("Firebase Admin SDK inicializado com sucesso!")
-except ValueError as e:
-    print(f"Erro ao inicializar Firebase Admin SDK: {e}. Verifique se FIREBASE_SERVICE_ACCOUNT_CONFIG está correto.")
+    firebase_config_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON')
+    if firebase_config_json:
+        FIREBASE_SERVICE_ACCOUNT_CONFIG = json.loads(firebase_config_json)
+    else:
+        print("Variável de ambiente 'FIREBASE_SERVICE_ACCOUNT_JSON' não encontrada.")
+except json.JSONDecodeError as e:
+    print(f"Erro ao decodificar JSON da variável de ambiente FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
 except Exception as e:
-    print(f"Erro inesperado na inicialização do Firebase: {e}")
+    print(f"Erro inesperado ao carregar credenciais do Firebase de variável de ambiente: {e}")
+
+# Inicializa o Firebase Admin SDK e Firestore
+db = None # Inicializa db como None
+if FIREBASE_SERVICE_ACCOUNT_CONFIG:
+    try:
+        cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_CONFIG)
+        firebase_admin.initialize_app(cred)
+        db = firestore.client() # Inicializa o cliente Firestore
+        print("Firebase Admin SDK e Firestore inicializados com sucesso!")
+    except ValueError as e:
+        print(f"Erro ao inicializar Firebase Admin SDK: {e}. Verifique se FIREBASE_SERVICE_ACCOUNT_CONFIG está correto.")
+    except Exception as e:
+        print(f"Erro inesperado na inicialização do Firebase: {e}")
+else:
+    print("Firebase Admin SDK e Firestore NÃO inicializados: Credenciais não foram carregadas.")
 
 
 # --- Configuração do NLTK para português ---
@@ -40,12 +56,15 @@ for lang in SUPPORTED_LANGUAGES:
         nltk.download('stopwords', quiet=True)
         STOPWORDS_BY_LANG[lang] = set(nltk.corpus.stopwords.words(lang))
 
+# --- Limites de Uso ---
+MAX_FREE_ANALYSES_PER_DAY = 5 # Limite de análises por dia para usuários gratuitos
+
 # --- Rota Principal (Endpoint do Servidor Web) ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# --- Rotas de Autenticação ---
+# --- Rotas de Autenticação (EXISTENTES) ---
 @app.route('/signup', methods=['POST'])
 def signup():
     email = request.json.get('email')
@@ -54,13 +73,27 @@ def signup():
     if not email or not password:
         return jsonify({"error": "Email e senha são obrigatórios."}), 400
 
+    if not firebase_admin._apps:
+        return jsonify({"error": "Serviço de autenticação não disponível. Contate o suporte."}), 503
+
     try:
         user = auth.create_user(email=email, password=password)
-        # Opcional: Gerar um token de ID para login automático após o registro
-        # custom_token = auth.create_custom_token(user.uid)
+        # Cria um documento de usuário no Firestore com dados iniciais
+        user_ref = db.collection('users').document(user.uid)
+        user_ref.set({
+            'email': user.email,
+            'is_premium': False, # Novo campo para status premium
+            'analysis_count_today': 0,
+            'last_analysis_date': datetime.now(timezone.utc) # Armazena a data da última análise (UTC)
+        })
         return jsonify({"message": "Usuário criado com sucesso!", "uid": user.uid}), 201
     except Exception as e:
-        return jsonify({"error": f"Erro ao criar usuário: {e}"}), 400
+        error_message = str(e)
+        if "EMAIL_ALREADY_EXISTS" in error_message:
+            return jsonify({"error": "Este email já está em uso."}), 409
+        elif "WEAK_PASSWORD" in error_message:
+            return jsonify({"error": "A senha é muito fraca. Use pelo menos 6 caracteres."}), 400
+        return jsonify({"error": f"Erro ao criar usuário: {error_message}"}), 400
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -70,25 +103,87 @@ def login():
     if not email or not password:
         return jsonify({"error": "Email e senha são obrigatórios."}), 400
 
-    try:
-        # Firebase Admin SDK não tem uma função direta de "login" com email/senha.
-        # Ele é usado para gerenciar usuários (criar, desabilitar, etc.) e verificar tokens.
-        # O login real é feito no frontend com o SDK do Firebase Client.
-        # Aqui, podemos apenas verificar se o usuário existe ou gerar um token personalizado
-        # para o frontend usar. Para simplicidade, vamos apenas retornar sucesso se
-        # o usuário existir (isso é mais para um cenário de Admin SDK).
-        # Para um login real, o frontend enviaria as credenciais diretamente para o Firebase Auth.
+    if not firebase_admin._apps:
+        return jsonify({"error": "Serviço de autenticação não disponível. Contate o suporte."}), 503
 
-        # Para simular um "login" no backend com Admin SDK, você pode:
-        # 1. Tentar obter o usuário pelo email
+    try:
         user = auth.get_user_by_email(email)
-        # 2. Se o usuário existe, você pode gerar um custom token para o frontend
         custom_token = auth.create_custom_token(user.uid).decode('utf-8')
         return jsonify({"message": "Login bem-sucedido!", "uid": user.uid, "customToken": custom_token}), 200
     except auth.UserNotFoundError:
         return jsonify({"error": "Usuário não encontrado."}), 404
     except Exception as e:
         return jsonify({"error": f"Erro ao fazer login: {e}"}), 400
+
+# --- Middleware para verificar autenticação e status do usuário ---
+# Esta função será chamada antes de processar a análise
+@app.before_request
+def check_auth_and_usage():
+    # Apenas para a rota /analyze
+    if request.path == '/analyze' and request.method == 'POST':
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({"error": "Autenticação necessária. Faça login para usar o serviço."}), 401
+        
+        id_token = auth_header.split('Bearer ')[1]
+        
+        try:
+            # Verifica o token de ID do Firebase
+            decoded_token = auth.verify_id_token(id_token)
+            uid = decoded_token['uid']
+            
+            # Anexa o UID do usuário à requisição para uso posterior
+            request.user_uid = uid
+
+            # --- Lógica de Limite de Uso e Status Premium ---
+            if not db: # Se o Firestore não foi inicializado
+                return jsonify({"error": "Serviço de banco de dados não disponível. Contate o suporte."}), 503
+
+            user_ref = db.collection('users').document(uid)
+            user_doc = user_ref.get()
+
+            if not user_doc.exists:
+                # Se o documento do usuário não existe (deveria ter sido criado no signup), cria um padrão
+                user_ref.set({
+                    'email': decoded_token.get('email', 'N/A'),
+                    'is_premium': False,
+                    'analysis_count_today': 0,
+                    'last_analysis_date': datetime.now(timezone.utc)
+                })
+                user_data = {'is_premium': False, 'analysis_count_today': 0, 'last_analysis_date': datetime.now(timezone.utc)}
+            else:
+                user_data = user_doc.to_dict()
+
+            is_premium = user_data.get('is_premium', False)
+            analysis_count_today = user_data.get('analysis_count_today', 0)
+            last_analysis_date = user_data.get('last_analysis_date')
+
+            # Resetar a contagem se for um novo dia (UTC)
+            today_utc = datetime.now(timezone.utc).date()
+            if last_analysis_date and last_analysis_date.date() < today_utc:
+                analysis_count_today = 0
+                user_ref.update({
+                    'analysis_count_today': 0,
+                    'last_analysis_date': datetime.now(timezone.utc)
+                })
+            
+            if not is_premium and analysis_count_today >= MAX_FREE_ANALYSES_PER_DAY:
+                return jsonify({
+                    "error": f"Limite de análises diárias atingido ({MAX_FREE_ANALYSES_PER_DAY}). Faça upgrade para análises ilimitadas.",
+                    "limit_reached": True # Adiciona um flag para o frontend identificar
+                }), 429 # Too Many Requests
+            
+            # Anexa os dados do usuário à requisição para uso posterior na rota /analyze
+            request.user_data = user_data
+            request.user_ref = user_ref
+
+        except auth.InvalidIdTokenError:
+            return jsonify({"error": "Token de autenticação inválido ou expirado. Faça login novamente."}), 401
+        except Exception as e:
+            print(f"Erro na verificação de autenticação/limite: {e}")
+            return jsonify({"error": f"Erro de autenticação ou limite: {e}"}), 401
+    # Se não for a rota /analyze, continua normalmente
+    return None
 
 # --- Função auxiliar para analisar uma única URL ---
 def analyze_single_url(url):
@@ -187,8 +282,33 @@ def analyze():
     if not urls_to_analyze or not isinstance(urls_to_analyze, list) or not all(isinstance(url, str) for url in urls_to_analyze):
         return jsonify({"error": "Lista de URLs não fornecida ou formato inválido."}), 400
 
+    # O limite de URLs por análise é o número de URLs na lista
+    num_urls_in_request = len(urls_to_analyze)
+
+    # Verifica o limite de análises por requisição para usuários gratuitos
+    # Se o usuário não for premium e a requisição tiver mais URLs do que o permitido em uma única análise
+    # (Ex: um usuário gratuito pode fazer 5 análises por dia, mas cada análise só pode ter 1 URL)
+    # Por enquanto, estamos limitando o número total de análises por dia, não por requisição.
+    # Esta lógica pode ser adicionada aqui se você quiser um limite por requisição também.
+
     individual_results = []
     all_keywords_for_comparison = []
+
+    # Incrementa a contagem de análises para o usuário (se não for premium)
+    # Isso é feito APÓS a verificação do limite no check_auth_and_usage
+    # e antes de iniciar o processamento das URLs.
+    user_data = request.user_data # Dados do usuário anexados pelo @app.before_request
+    user_ref = request.user_ref # Referência ao documento do usuário anexada pelo @app.before_request
+
+    if not user_data.get('is_premium', False):
+        new_analysis_count = user_data.get('analysis_count_today', 0) + 1
+        user_ref.update({
+            'analysis_count_today': new_analysis_count,
+            'last_analysis_date': datetime.now(timezone.utc)
+        })
+        # Opcional: Anexar o novo limite restante à resposta para o frontend
+        remaining_analyses = MAX_FREE_ANALYSES_PER_DAY - new_analysis_count
+        request.remaining_analyses = remaining_analyses # Anexa para uso na resposta final
 
     for url_item in urls_to_analyze:
         error_message, analysis_data = analyze_single_url(url_item)
@@ -219,13 +339,28 @@ def analyze():
                     unique_to_current.difference_update(other_set)
             unique_keywords_per_url.append({"url": urls_to_analyze[i], "keywords": list(unique_to_current)})
     
-    return jsonify({
+    response_data = {
         "individual_results": individual_results,
         "comparison": {
             "common_keywords": list(common_keywords),
             "unique_keywords_per_url": unique_keywords_per_url
         }
-    })
+    }
+    # Adiciona informações de limite à resposta se for um usuário gratuito
+    if not user_data.get('is_premium', False):
+        response_data['user_limit_info'] = {
+            'is_premium': False,
+            'remaining_analyses': request.remaining_analyses,
+            'max_free_analyses': MAX_FREE_ANALYSES_PER_DAY
+        }
+    else:
+        response_data['user_limit_info'] = {
+            'is_premium': True,
+            'remaining_analyses': 'Unlimited', # Ou um valor grande
+            'max_free_analyses': 'Unlimited'
+        }
+
+    return jsonify(response_data)
 
 # --- Execução do Aplicativo Flask ---
 if __name__ == '__main__':
