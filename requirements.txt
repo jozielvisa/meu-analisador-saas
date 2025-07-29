@@ -44,6 +44,7 @@ pyasn1==0.6.1
 pyasn1_modules==0.4.2
 pycparser==2.22
 PyJWT==2.10.1
+python-dotenv==1.1.1
 regex==2024.11.6
 requests==2.32.4
 rsa==4.9.1
