@@ -1,0 +1,7 @@
+.env
+# Python
+__pycache__/
+*.pyc
+.env
+# Adicione esta linha
+venv/
