@@ -320,8 +320,11 @@
                     lastAnalyzedData = data; // Armazena a resposta completa para exportação
 
                     if (response.ok) {
-                        // Limpa o campo da URL (opcional, se quiser limpar todos os campos após a análise)
-                        // urlInputs.forEach(input => input.value = ''); // Descomente se quiser limpar todos os campos
+                        // Limpa os campos de URL após uma análise bem-sucedida
+                        urlInputs.forEach(input => {
+                            input.value = ''; // Limpa o valor do input
+                            input.classList.remove('is-valid', 'is-invalid'); // Remove as classes de validação
+                        });
 
                         // --- Exibir Resultados Individuais ---
                         data.individual_results.forEach((result, index) => {
@@ -339,7 +342,7 @@
                                     `<span class="badge bg-primary ms-2">${result.detected_language.toUpperCase()}</span>` : '';
 
                                 card.innerHTML += `
-                                    <h5 class="mt-3">Idioma Detectado: ${detectedLangDisplay}</h5> <!-- ADICIONADO AQUI -->
+                                    <h5 class="mt-3">Idioma Detectado: ${detectedLangDisplay}</h5>
                                     <div class="chart-container">
                                         <canvas id="keywordsChart-${index}"></canvas>
                                     </div>
@@ -353,7 +356,7 @@
                                 const scores = result.top_keywords.map(item => item[1]);
 
                                 const ctx = document.getElementById(`keywordsChart-${index}`).getContext('2d');
-                                new Chart(ctx, { // Não precisamos de window.keywordsChartInstance aqui, pois cada gráfico é único
+                                new Chart(ctx, {
                                     type: 'bar',
                                     data: {
                                         labels: labels,
@@ -399,20 +402,21 @@
                                 });
                             }
                             // Adiciona o card ao container principal APÓS todo o conteúdo ser adicionado a ele
-                            individualResultsContainer.appendChild(card); 
+                            individualResultsContainer.appendChild(card);
                         });
 
-                        // --- Exibir Palavras-chave Comuns ---
-                        data.comparison.common_keywords.forEach(keyword => {
-                            const li = document.createElement('li');
-                            li.textContent = keyword;
-                            commonKeywordsList.appendChild(li);
-                        });
+                        // --- Exibir Palavras-chave Comuns (AGORA COM MENSAGEM CLARA) ---
                         if (data.comparison.common_keywords.length === 0) {
-                            commonKeywordsList.innerHTML = '<li class="text-muted">Nenhuma palavra-chave comum encontrada.</li>';
+                            commonKeywordsList.innerHTML = '<li class="text-muted">Não foram encontradas palavras-chave comuns entre os sites analisados.</li>';
+                        } else {
+                            data.comparison.common_keywords.forEach(keyword => {
+                                const li = document.createElement('li');
+                                li.textContent = keyword;
+                                commonKeywordsList.appendChild(li);
+                            });
                         }
 
-                        // --- Exibir Palavras-chave Únicas por URL ---
+                        // --- Exibir Palavras-chave Únicas por URL (AGORA COM MENSAGEM CLARA) ---
                         data.comparison.unique_keywords_per_url.forEach(url_unique => {
                             const uniqueCard = document.createElement('div');
                             uniqueCard.className = 'card mb-2';
@@ -424,7 +428,7 @@
                             `;
                             const uniqueList = uniqueCard.querySelector('ul');
                             if (url_unique.keywords.length === 0) {
-                                uniqueList.innerHTML = '<li class="text-muted">Nenhuma palavra-chave única encontrada.</li>';
+                                uniqueList.innerHTML = '<li class="text-muted">Nenhuma palavra-chave única encontrada para esta URL.</li>';
                             } else {
                                 url_unique.keywords.forEach(keyword => {
                                     const li = document.createElement('li');
