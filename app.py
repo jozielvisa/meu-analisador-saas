@@ -7,6 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from langdetect import detect, DetectorFactory
 import firebase_admin
 from firebase_admin import credentials, auth
+from dotenv import load_dotenv
+load_dotenv() # Carrega as variáveis do .env
 
 # Garante que a detecção de idioma seja consistente
 DetectorFactory.seed = 0
