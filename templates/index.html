@@ -3,11 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analisador de Concorrência - Múltiplas URLs</title>
+    <title>Analisador de Concorrência - Login</title>
     <!-- Inclui o Bootstrap para deixar o visual mais bonito e responsivo -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Inclui a biblioteca Chart.js para gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // Importa os módulos necessários do Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        // Importa Firestore (para uso futuro, já deixamos pronto)
+        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Sua configuração do Firebase (COLE AQUI O SEU firebaseConfig)
+        const firebaseConfig = {
+            apiKey: "SUA_API_KEY", // Exemplo: "AIzaSyC_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            authDomain: "seu-projeto.firebaseapp.com", // Exemplo: "seu-projeto.firebaseapp.com"
+            projectId: "seu-project-id", // Exemplo: "seu-project-id"
+            storageBucket: "seu-projeto.appspot.com", // Exemplo: "seu-projeto.appspot.com"
+            messagingSenderId: "SEU_SENDER_ID", // Exemplo: "1234567890"
+            appId: "SEU_APP_ID", // Exemplo: "1:1234567890:web:abcdef1234567890"
+            measurementId: "SEU_MEASUREMENT_ID" // Opcional
+        };
+
+        // Inicializa o Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app); // Inicializa Firestore
+
+        // Torna auth e db acessíveis globalmente para o restante do script
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.onAuthStateChanged = onAuthStateChanged; // Torna onAuthStateChanged acessível
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.signOut = signOut;
+    </script>
+
     <style>
         body {
             padding-top: 50px;
@@ -101,10 +135,29 @@
             font-size: 0.8em; /* Ajusta o tamanho da fonte do badge */
             vertical-align: middle; /* Alinha verticalmente com o texto */
         }
+        /* Estilos para a barra de navegação de autenticação */
+        .auth-controls {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        #userInfo {
+            font-weight: bold;
+            color: #0d6efd;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Controles de Autenticação -->
+        <div class="auth-controls">
+            <span id="userInfo" style="display: none;"></span>
+            <button class="btn btn-outline-primary" id="loginButton" data-bs-toggle="modal" data-bs-target="#loginModal" style="display: none;">Login</button>
+            <button class="btn btn-primary" id="signupButton" data-bs-toggle="modal" data-bs-target="#signupModal" style="display: none;">Registrar</button>
+            <button class="btn btn-outline-danger" id="logoutButton" style="display: none;">Sair</button>
+        </div>
+
         <h1 class="mb-4 text-center text-primary">Analisador de Concorrência (Múltiplas URLs)</h1>
         <p class="text-center text-muted">Insira as URLs dos concorrentes para comparar as palavras-chave mais usadas.</p>
         
@@ -165,14 +218,65 @@
         </div>
     </div>
 
+    <!-- Modal de Login -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel">Login</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="loginEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="loginEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="loginPassword" class="form-label">Senha</label>
+                            <input type="password" class="form-control" id="loginPassword" required>
+                        </div>
+                        <div id="loginError" class="alert alert-danger" style="display: none;"></div>
+                        <button type="submit" class="btn btn-primary">Entrar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Registro -->
+    <div class="modal fade" id="signupModal" tabindex="-1" aria-labelledby="signupModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="signupModalLabel">Registrar</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="signupForm">
+                        <div class="mb-3">
+                            <label for="signupEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="signupEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="signupPassword" class="form-label">Senha</label>
+                            <input type="password" class="form-control" id="signupPassword" required>
+                        </div>
+                        <div id="signupError" class="alert alert-danger" style="display: none;"></div>
+                        <button type="submit" class="btn btn-primary">Registrar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts do Bootstrap (se estiver usando JS deles) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Seu script JavaScript personalizado -->
     <script>
-        // Variável global (ou "quase" global, pois está dentro do DOMContentLoaded) para armazenar os dados.
-        // É importante que ela seja declarada FORA do listener do analyzeButton, mas dentro do DOMContentLoaded.
-        let lastAnalyzedData = null; // Agora armazenará a estrutura completa da resposta do backend
+        // Variável global para armazenar os últimos dados de palavras-chave analisados
+        let lastAnalyzedData = null;
 
         document.addEventListener('DOMContentLoaded', function() {
             // Seleciona todos os elementos HTML que vamos manipular
@@ -185,8 +289,24 @@
             const commonKeywordsList = document.getElementById('commonKeywordsList');
             const uniqueKeywordsContainer = document.getElementById('uniqueKeywordsContainer');
 
+            // Elementos de Autenticação
+            const userInfoSpan = document.getElementById('userInfo');
+            const loginButton = document.getElementById('loginButton');
+            const signupButton = document.getElementById('signupButton');
+            const logoutButton = document.getElementById('logoutButton');
+
+            // Formulários de Autenticação
+            const loginForm = document.getElementById('loginForm');
+            const loginEmailInput = document.getElementById('loginEmail');
+            const loginPasswordInput = document.getElementById('loginPassword');
+            const loginErrorDiv = document.getElementById('loginError');
+
+            const signupForm = document.getElementById('signupForm');
+            const signupEmailInput = document.getElementById('signupEmail');
+            const signupPasswordInput = document.getElementById('signupPassword');
+            const signupErrorDiv = document.getElementById('signupError');
+
             // Seleciona os botões de exportação que estarão fixos no HTML
-            // (Estes botões são adicionados dinamicamente ao resultsDiv no final do script)
             const exportButtonsContainer = document.createElement('div');
             exportButtonsContainer.className = 'mt-3 text-center';
             exportButtonsContainer.id = 'exportButtonsContainer';
@@ -210,8 +330,8 @@
             function validateUrlInput(inputElement) {
                 const url = inputElement.value.trim();
                 if (url === '') {
-                    inputElement.classList.remove('is-valid', 'is-invalid'); // Remove validação se estiver vazio
-                    return true; // Considera vazio como "não validado ainda", não "inválido"
+                    inputElement.classList.remove('is-valid', 'is-invalid');
+                    return true;
                 } else if (urlPattern.test(url)) {
                     inputElement.classList.add('is-valid');
                     inputElement.classList.remove('is-invalid');
@@ -226,7 +346,7 @@
             // Função para adicionar um novo campo de URL
             function addUrlInputField() {
                 const newDiv = document.createElement('div');
-                newDiv.className = 'input-group url-input-group has-validation'; // Adicionado has-validation
+                newDiv.className = 'input-group url-input-group has-validation';
                 newDiv.innerHTML = `
                     <input type="url" class="form-control form-control-lg competitor-url-input" placeholder="Ex: https://www.outro-exemplo.com.br" required>
                     <button class="btn btn-outline-secondary add-url-btn" type="button" style="display: none;">Adicionar URL</button>
@@ -239,14 +359,14 @@
                     </div>
                 `;
                 urlInputsContainer.appendChild(newDiv);
-                attachInputListeners(newDiv); // Anexa listeners ao novo campo
+                attachInputListeners(newDiv);
             }
 
             // Função para anexar listeners aos botões de adicionar/remover URL e ao input para validação em tempo real
             function attachInputListeners(container) {
                 const addBtn = container.querySelector('.add-url-btn');
                 const removeBtn = container.querySelector('.remove-url-btn');
-                const urlInput = container.querySelector('.competitor-url-input'); // Pega o input de URL dentro deste container
+                const urlInput = container.querySelector('.competitor-url-input');
 
                 if (addBtn) {
                     addBtn.addEventListener('click', addUrlInputField);
@@ -256,7 +376,6 @@
                         container.remove();
                     });
                 }
-                // ADICIONADO: Listener para validação em tempo real enquanto o usuário digita
                 if (urlInput) {
                     urlInput.addEventListener('input', () => {
                         validateUrlInput(urlInput);
@@ -264,27 +383,135 @@
                 }
             }
 
-            // Anexa listeners ao campo de URL inicial (que já existe no HTML)
+            // Anexa listeners ao campo de URL inicial
             attachInputListeners(urlInputsContainer.querySelector('.url-input-group'));
 
 
-            // --- Adiciona o "ouvinte de evento" ao botão de análise ---
+            // --- Lógica de Autenticação Firebase ---
+
+            // Listener de estado de autenticação
+            window.onAuthStateChanged(window.firebaseAuth, (user) => {
+                if (user) {
+                    // Usuário logado
+                    userInfoSpan.textContent = `Olá, ${user.email}!`;
+                    userInfoSpan.style.display = 'inline';
+                    loginButton.style.display = 'none';
+                    signupButton.style.display = 'none';
+                    logoutButton.style.display = 'inline-block';
+                    // Habilitar funcionalidades da aplicação (análise, etc.)
+                    analyzeButton.disabled = false;
+                } else {
+                    // Usuário deslogado
+                    userInfoSpan.style.display = 'none';
+                    loginButton.style.display = 'inline-block';
+                    signupButton.style.display = 'inline-block';
+                    logoutButton.style.display = 'none';
+                    // Desabilitar funcionalidades da aplicação
+                    analyzeButton.disabled = true;
+                    // Limpar resultados e alerts
+                    resultsDiv.style.display = 'none';
+                    errorAlert.style.display = 'none';
+                    loadingDiv.style.display = 'none';
+                    exportButtonsContainer.style.display = 'none';
+                }
+            });
+
+            // Lógica de Registro
+            signupForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = signupEmailInput.value;
+                const password = signupPasswordInput.value;
+                signupErrorDiv.style.display = 'none';
+
+                try {
+                    // Usa o SDK do Firebase Client para criar o usuário
+                    const userCredential = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
+                    // Opcional: Enviar para o backend para criar um registro no Admin SDK se necessário (já fizemos isso no backend, mas o cliente SDK é o que realmente autentica)
+                    // const response = await fetch('/signup', { /* ... */ });
+                    alert('Registro bem-sucedido! Você está logado.');
+                    // Fecha o modal de registro
+                    const signupModal = bootstrap.Modal.getInstance(document.getElementById('signupModal'));
+                    if (signupModal) signupModal.hide();
+                } catch (error) {
+                    let errorMessage = 'Erro no registro.';
+                    if (error.code === 'auth/email-already-in-use') {
+                        errorMessage = 'Este email já está em uso.';
+                    } else if (error.code === 'auth/weak-password') {
+                        errorMessage = 'A senha é muito fraca (mínimo 6 caracteres).';
+                    } else if (error.code === 'auth/invalid-email') {
+                        errorMessage = 'O formato do email é inválido.';
+                    }
+                    signupErrorDiv.textContent = errorMessage;
+                    signupErrorDiv.style.display = 'block';
+                    console.error("Erro de registro:", error);
+                }
+            });
+
+            // Lógica de Login
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = loginEmailInput.value;
+                const password = loginPasswordInput.value;
+                loginErrorDiv.style.display = 'none';
+
+                try {
+                    // Usa o SDK do Firebase Client para fazer login
+                    const userCredential = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
+                    // Opcional: Enviar para o backend para obter um custom token se necessário para outras APIs (já fizemos isso no backend)
+                    // const response = await fetch('/login', { /* ... */ });
+                    alert('Login bem-sucedido!');
+                    // Fecha o modal de login
+                    const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                    if (loginModal) loginModal.hide();
+                } catch (error) {
+                    let errorMessage = 'Erro no login.';
+                    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                        errorMessage = 'Email ou senha incorretos.';
+                    } else if (error.code === 'auth/invalid-email') {
+                        errorMessage = 'O formato do email é inválido.';
+                    }
+                    loginErrorDiv.textContent = errorMessage;
+                    loginErrorDiv.style.display = 'block';
+                    console.error("Erro de login:", error);
+                }
+            });
+
+            // Lógica de Logout
+            logoutButton.addEventListener('click', async () => {
+                try {
+                    await window.signOut(window.firebaseAuth);
+                    alert('Você foi desconectado.');
+                } catch (error) {
+                    console.error("Erro ao fazer logout:", error);
+                    alert('Erro ao fazer logout. Tente novamente.');
+                }
+            });
+
+
+            // --- Lógica de Análise (EXISTENTE, AGORA DENTRO DO CONTEXTO DE AUTENTICAÇÃO) ---
             analyzeButton.addEventListener('click', async () => {
+                // Verifica se o usuário está logado antes de permitir a análise
+                if (!window.firebaseAuth.currentUser) {
+                    errorAlert.textContent = 'Você precisa estar logado para realizar análises.';
+                    errorAlert.style.display = 'block';
+                    return;
+                }
+
                 const urlInputs = document.querySelectorAll('.competitor-url-input');
                 const urls = Array.from(urlInputs)
                                   .map(input => input.value.trim())
-                                  .filter(value => value !== ''); // Pega todas as URLs e filtra vazias
+                                  .filter(value => value !== '');
 
                 // --- Resetar o estado da interface ---
                 resultsDiv.style.display = 'none';
                 errorAlert.style.display = 'none';
-                individualResultsContainer.innerHTML = ''; // Limpa resultados individuais
-                commonKeywordsList.innerHTML = ''; // Limpa lista de comuns
-                uniqueKeywordsContainer.innerHTML = ''; // Limpa lista de únicas
-                loadingDiv.style.display = 'none'; // Garante que o carregamento esteja escondido no início
-                exportButtonsContainer.style.display = 'none'; // Esconde os botões de exportação
+                individualResultsContainer.innerHTML = '';
+                commonKeywordsList.innerHTML = '';
+                uniqueKeywordsContainer.innerHTML = '';
+                loadingDiv.style.display = 'none';
+                exportButtonsContainer.style.display = 'none';
 
-                // --- Validação das URLs (Ajustada para validação em tempo real) ---
+                // --- Validação das URLs ---
                 if (urls.length === 0) {
                     errorAlert.textContent = 'Por favor, insira pelo menos uma URL para análise.';
                     errorAlert.style.display = 'block';
@@ -292,9 +519,9 @@
                 }
 
                 let allUrlsValid = true;
-                const allUrlInputs = document.querySelectorAll('.competitor-url-input'); // Seleciona todos os inputs novamente
+                const allUrlInputs = document.querySelectorAll('.competitor-url-input');
                 allUrlInputs.forEach(inputElement => {
-                    if (!validateUrlInput(inputElement)) { // Valida cada input e verifica se algum é inválido
+                    if (!validateUrlInput(inputElement)) {
                         allUrlsValid = false;
                     }
                 });
@@ -305,28 +532,24 @@
                     return;
                 }
 
-                // --- Iniciar o processo de análise ---
-                loadingDiv.style.display = 'block'; // Mostra o indicador de carregamento
+                loadingDiv.style.display = 'block';
 
                 try {
-                    // Faz a requisição POST para o backend com a LISTA de URLs
                     const response = await fetch('/analyze', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ urls: urls }), // Envia um objeto com a chave 'urls' e a lista
+                        body: JSON.stringify({ urls: urls }),
                     });
 
-                    const data = await response.json(); // A resposta agora tem 'individual_results' e 'comparison'
-                    lastAnalyzedData = data; // Armazena a resposta completa para exportação
+                    const data = await response.json();
+                    lastAnalyzedData = data;
 
                     if (response.ok) {
-                        // Limpa os campos de URL após uma análise bem-sucedida
                         urlInputs.forEach(input => {
-                            input.value = ''; // Limpa o valor do input
-                            input.classList.remove('is-valid', 'is-invalid'); // Remove as classes de validação
+                            input.value = '';
+                            input.classList.remove('is-valid', 'is-invalid');
                         });
 
-                        // --- Exibir Resultados Individuais ---
                         data.individual_results.forEach((result, index) => {
                             const card = document.createElement('div');
                             card.className = 'individual-result-card';
@@ -337,7 +560,6 @@
                             if (result.status === 'error') {
                                 card.innerHTML += `<p class="alert alert-warning">${result.message}</p>`;
                             } else {
-                                // Adiciona o idioma detectado
                                 const detectedLangDisplay = result.detected_language ?
                                     `<span class="badge bg-primary ms-2">${result.detected_language.toUpperCase()}</span>` : '';
 
@@ -351,7 +573,6 @@
                                 `;
                                 individualResultsContainer.appendChild(card);
 
-                                // Renderiza o gráfico
                                 const labels = result.top_keywords.map(item => item[0]);
                                 const scores = result.top_keywords.map(item => item[1]);
 
@@ -392,7 +613,6 @@
                                     }
                                 });
 
-                                // Preenche a lista detalhada
                                 const currentKeywordsList = card.querySelector(`.keywords-list-${index}`);
                                 result.top_keywords.forEach(item => {
                                     const li = document.createElement('li');
@@ -401,22 +621,20 @@
                                     currentKeywordsList.appendChild(li);
                                 });
                             }
-                            // Adiciona o card ao container principal APÓS todo o conteúdo ser adicionado a ele
                             individualResultsContainer.appendChild(card);
                         });
 
-                        // --- Exibir Palavras-chave Comuns (AGORA COM MENSAGEM CLARA) ---
                         if (data.comparison.common_keywords.length === 0) {
                             commonKeywordsList.innerHTML = '<li class="text-muted">Não foram encontradas palavras-chave comuns entre os sites analisados.</li>';
                         } else {
-                            data.comparison.common_keywords.forEach(keyword => {
+                            const sortedCommonKeywords = data.comparison.common_keywords.sort();
+                            sortedCommonKeywords.forEach(keyword => {
                                 const li = document.createElement('li');
                                 li.textContent = keyword;
                                 commonKeywordsList.appendChild(li);
                             });
                         }
 
-                        // --- Exibir Palavras-chave Únicas por URL (AGORA COM MENSAGEM CLARA) ---
                         data.comparison.unique_keywords_per_url.forEach(url_unique => {
                             const uniqueCard = document.createElement('div');
                             uniqueCard.className = 'card mb-2';
@@ -430,7 +648,8 @@
                             if (url_unique.keywords.length === 0) {
                                 uniqueList.innerHTML = '<li class="text-muted">Nenhuma palavra-chave única encontrada para esta URL.</li>';
                             } else {
-                                url_unique.keywords.forEach(keyword => {
+                                const sortedUniqueKeywords = url_unique.keywords.sort();
+                                sortedUniqueKeywords.forEach(keyword => {
                                     const li = document.createElement('li');
                                     li.textContent = keyword;
                                     uniqueList.appendChild(li);
@@ -439,29 +658,28 @@
                             uniqueKeywordsContainer.appendChild(uniqueCard);
                         });
 
-                        resultsDiv.style.display = 'block'; // Mostra a área de resultados principal
-                        exportButtonsContainer.style.display = 'block'; // Mostra os botões de exportação
+                        resultsDiv.style.display = 'block';
+                        exportButtonsContainer.style.display = 'block';
 
-                    } else { // Se a resposta do backend for um erro (código 4xx ou 5xx)
+                    } else {
                         errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar as URLs.';
                         errorAlert.style.display = 'block';
-                        exportButtonsContainer.style.display = 'none'; // Esconde os botões de exportação
+                        exportButtonsContainer.style.display = 'none';
                     }
-                } catch (error) { // Captura erros de rede
+                } catch (error) {
                     errorAlert.textContent = `Erro de conexão ou problema inesperado: ${error.message}. Verifique se o backend está rodando.`;
                     errorAlert.style.display = 'block';
-                    exportButtonsContainer.style.display = 'none'; // Esconde os botões de exportação
+                    exportButtonsContainer.style.display = 'none';
                 } finally {
-                    loadingDiv.style.display = 'none'; // Sempre esconde o indicador de carregamento no final
+                    loadingDiv.style.display = 'none';
                 }
-            }); // Fim do addEventListener do analyzeButton
+            });
 
 
             // ***************************************************************
-            // FUNÇÕES DE EXPORTAÇÃO E LISTENERS DE EVENTO PARA ELAS
+            // FUNÇÕES DE EXPORTAÇÃO (EXISTENTES)
             // ***************************************************************
 
-            // Função para exportar para CSV
             function exportToCsv() {
                 if (!lastAnalyzedData) {
                     alert('Nenhum dado para exportar.');
@@ -470,7 +688,6 @@
 
                 let csvContent = "Tipo,URL,Palavra-chave,Score TF-IDF\n";
 
-                // Adiciona resultados individuais
                 lastAnalyzedData.individual_results.forEach(result => {
                     if (result.status === 'success') {
                         result.top_keywords.forEach(item => {
@@ -481,19 +698,17 @@
                     }
                 });
 
-                // Adiciona palavras-chave comuns
                 if (lastAnalyzedData.comparison.common_keywords.length > 0) {
                     lastAnalyzedData.comparison.common_keywords.forEach(keyword => {
                         const escapedKeyword = `"${keyword.replace(/"/g, '""')}"`;
-                        csvContent += `Comum,,${escapedKeyword},\n`; // Sem score para comum
+                        csvContent += `Comum,,${escapedKeyword},\n`;
                     });
                 }
 
-                // Adiciona palavras-chave únicas
                 lastAnalyzedData.comparison.unique_keywords_per_url.forEach(unique_item => {
                     unique_item.keywords.forEach(keyword => {
                         const escapedKeyword = `"${keyword.replace(/"/g, '""')}"`;
-                        csvContent += `Única,"${unique_item.url}",${escapedKeyword},\n`; // Sem score para única
+                        csvContent += `Única,"${unique_item.url}",${escapedKeyword},\n`;
                     });
                 });
 
@@ -506,7 +721,6 @@
                 document.body.removeChild(link);
             }
 
-            // Função para exportar para JSON
             function exportToJson() {
                 if (!lastAnalyzedData) {
                     alert('Nenhum dado para exportar.');
@@ -522,7 +736,6 @@
                 document.body.removeChild(link);
             }
 
-            // Adiciona os ouvintes de evento aos botões de exportação
             fixedExportCsvButton.addEventListener('click', exportToCsv);
             fixedExportJsonButton.addEventListener('click', exportToJson);
 
