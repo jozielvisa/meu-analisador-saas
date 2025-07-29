@@ -19,13 +19,12 @@
 
         // Sua configuração do Firebase (COLE AQUI O SEU firebaseConfig)
         const firebaseConfig = {
-            apiKey: "SUA_API_KEY", // Exemplo: "AIzaSyC_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-            authDomain: "seu-projeto.firebaseapp.com", // Exemplo: "seu-projeto.firebaseapp.com"
-            projectId: "seu-project-id", // Exemplo: "seu-project-id"
-            storageBucket: "seu-projeto.appspot.com", // Exemplo: "seu-projeto.appspot.com"
-            messagingSenderId: "SEU_SENDER_ID", // Exemplo: "1234567890"
-            appId: "SEU_APP_ID", // Exemplo: "1:1234567890:web:abcdef1234567890"
-            measurementId: "SEU_MEASUREMENT_ID" // Opcional
+            apiKey: "AIzaSyCw6qOheI0zpo4yQe3LScpegMFIdiwoDvk",
+            authDomain: "analyzer-console.firebaseapp.com",
+            projectId: "analyzer-console",
+            storageBucket: "analisador-console.firebasestorage.app",
+            messagingSenderId: "38890762315",
+            appId: "1:38890762315:web:238968554fadc9e73c9dce"
         };
 
         // Inicializa o Firebase
@@ -426,8 +425,6 @@
                 try {
                     // Usa o SDK do Firebase Client para criar o usuário
                     const userCredential = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
-                    // Opcional: Enviar para o backend para criar um registro no Admin SDK se necessário (já fizemos isso no backend, mas o cliente SDK é o que realmente autentica)
-                    // const response = await fetch('/signup', { /* ... */ });
                     alert('Registro bem-sucedido! Você está logado.');
                     // Fecha o modal de registro
                     const signupModal = bootstrap.Modal.getInstance(document.getElementById('signupModal'));
@@ -457,8 +454,6 @@
                 try {
                     // Usa o SDK do Firebase Client para fazer login
                     const userCredential = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
-                    // Opcional: Enviar para o backend para obter um custom token se necessário para outras APIs (já fizemos isso no backend)
-                    // const response = await fetch('/login', { /* ... */ });
                     alert('Login bem-sucedido!');
                     // Fecha o modal de login
                     const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
