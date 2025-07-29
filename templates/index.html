@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analisador de Concorrência - Login</title>
+    <title>Analisador de Concorrência - Freemium</title>
     <!-- Inclui o Bootstrap para deixar o visual mais bonito e responsivo -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Inclui a biblioteca Chart.js para gráficos -->
@@ -17,7 +17,7 @@
         // Importa Firestore (para uso futuro, já deixamos pronto)
         import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        // Sua configuração do Firebase (COLE AQUI O SEU firebaseConfig)
+        // Sua configuração do Firebase (SUAS CREDENCIAIS FORNECIDAS)
         const firebaseConfig = {
             apiKey: "AIzaSyCw6qOheI0zpo4yQe3LScpegMFIdiwoDvk",
             authDomain: "analyzer-console.firebaseapp.com",
@@ -177,6 +177,7 @@
         
         <div class="d-grid gap-2">
             <button class="btn btn-primary btn-lg mt-3" id="analyzeButton">Analisar Todas</button>
+            <p id="usageInfo" class="text-center text-muted mt-2" style="display: none;"></p> <!-- NOVO ELEMENTO PARA INFORMAÇÃO DE USO -->
         </div>
 
         <!-- Indicador de carregamento (inicialmente escondido) -->
@@ -287,6 +288,7 @@
             const individualResultsContainer = document.getElementById('individualResultsContainer');
             const commonKeywordsList = document.getElementById('commonKeywordsList');
             const uniqueKeywordsContainer = document.getElementById('uniqueKeywordsContainer');
+            const usageInfo = document.getElementById('usageInfo'); // NOVO: Seleciona o elemento de informação de uso
 
             // Elementos de Autenticação
             const userInfoSpan = document.getElementById('userInfo');
@@ -412,6 +414,7 @@
                     errorAlert.style.display = 'none';
                     loadingDiv.style.display = 'none';
                     exportButtonsContainer.style.display = 'none';
+                    usageInfo.style.display = 'none'; // Esconde a info de uso quando desloga
                 }
             });
 
@@ -483,11 +486,23 @@
             });
 
 
-            // --- Lógica de Análise (EXISTENTE, AGORA DENTRO DO CONTEXTO DE AUTENTICAÇÃO) ---
+            // --- Lógica de Análise (AGORA COM ENVIO DE TOKEN E EXIBIÇÃO DE LIMITES) ---
             analyzeButton.addEventListener('click', async () => {
                 // Verifica se o usuário está logado antes de permitir a análise
-                if (!window.firebaseAuth.currentUser) {
+                const currentUser = window.firebaseAuth.currentUser;
+                if (!currentUser) {
                     errorAlert.textContent = 'Você precisa estar logado para realizar análises.';
+                    errorAlert.style.display = 'block';
+                    return;
+                }
+
+                // Obtém o token de ID do Firebase do usuário logado
+                let idToken;
+                try {
+                    idToken = await currentUser.getIdToken();
+                } catch (error) {
+                    console.error("Erro ao obter token de ID:", error);
+                    errorAlert.textContent = 'Erro de autenticação. Tente fazer login novamente.';
                     errorAlert.style.display = 'block';
                     return;
                 }
@@ -505,6 +520,7 @@
                 uniqueKeywordsContainer.innerHTML = '';
                 loadingDiv.style.display = 'none';
                 exportButtonsContainer.style.display = 'none';
+                usageInfo.style.display = 'none'; // Esconde a info de uso ao iniciar nova análise
 
                 // --- Validação das URLs ---
                 if (urls.length === 0) {
@@ -532,135 +548,167 @@
                 try {
                     const response = await fetch('/analyze', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${idToken}` // ENVIA O TOKEN AQUI
+                        },
                         body: JSON.stringify({ urls: urls }),
                     });
 
                     const data = await response.json();
                     lastAnalyzedData = data;
 
-                    if (response.ok) {
-                        urlInputs.forEach(input => {
-                            input.value = '';
-                            input.classList.remove('is-valid', 'is-invalid');
-                        });
-
-                        data.individual_results.forEach((result, index) => {
-                            const card = document.createElement('div');
-                            card.className = 'individual-result-card';
-                            card.innerHTML = `
-                                <h3 class="text-info">Análise para: <span class="text-break">${result.url}</span></h3>
+                    // --- TRATAMENTO DE ERRO DE LIMITE (429) E OUTROS ERROS ---
+                    if (!response.ok) {
+                        if (response.status === 429 && data.limit_reached) { // Verifica o status e o flag do backend
+                            errorAlert.innerHTML = `
+                                <strong>${data.error}</strong><br>
+                                Para análises ilimitadas, considere fazer upgrade para o plano Premium.
+                                <button class="btn btn-warning btn-sm mt-2" onclick="alert('Funcionalidade de upgrade em breve!')">Fazer Upgrade</button>
                             `;
+                            errorAlert.style.display = 'block';
+                        } else {
+                            errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar as URLs.';
+                            errorAlert.style.display = 'block';
+                        }
+                        exportButtonsContainer.style.display = 'none';
+                        return; // Sai da função se houver erro
+                    }
 
-                            if (result.status === 'error') {
-                                card.innerHTML += `<p class="alert alert-warning">${result.message}</p>`;
-                            } else {
-                                const detectedLangDisplay = result.detected_language ?
-                                    `<span class="badge bg-primary ms-2">${result.detected_language.toUpperCase()}</span>` : '';
+                    // --- SE A RESPOSTA FOR OK (200) ---
+                    // Limpa os campos de URL após uma análise bem-sucedida
+                    urlInputs.forEach(input => {
+                        input.value = '';
+                        input.classList.remove('is-valid', 'is-invalid');
+                    });
 
-                                card.innerHTML += `
-                                    <h5 class="mt-3">Idioma Detectado: ${detectedLangDisplay}</h5>
-                                    <div class="chart-container">
-                                        <canvas id="keywordsChart-${index}"></canvas>
-                                    </div>
-                                    <h4 class="mt-3">Palavras-chave Detalhadas:</h4>
-                                    <ul class="list-group keywords-list-${index}"></ul>
-                                `;
-                                individualResultsContainer.appendChild(card);
+                    // Exibe a informação de uso
+                    if (data.user_limit_info) {
+                        if (data.user_limit_info.is_premium) {
+                            usageInfo.textContent = 'Você tem acesso Premium (análises ilimitadas)!';
+                            usageInfo.classList.remove('text-muted');
+                            usageInfo.classList.add('text-success');
+                        } else {
+                            usageInfo.textContent = `Análises gratuitas restantes hoje: ${data.user_limit_info.remaining_analyses} de ${data.user_limit_info.max_free_analyses}`;
+                            usageInfo.classList.remove('text-success');
+                            usageInfo.classList.add('text-muted');
+                        }
+                        usageInfo.style.display = 'block';
+                    }
 
-                                const labels = result.top_keywords.map(item => item[0]);
-                                const scores = result.top_keywords.map(item => item[1]);
 
-                                const ctx = document.getElementById(`keywordsChart-${index}`).getContext('2d');
-                                new Chart(ctx, {
-                                    type: 'bar',
-                                    data: {
-                                        labels: labels,
-                                        datasets: [{
-                                            label: 'Score TF-IDF',
-                                            data: scores,
-                                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                                            borderColor: 'rgba(54, 162, 235, 1)',
-                                            borderWidth: 1
-                                        }]
-                                    },
-                                    options: {
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        indexAxis: 'y',
-                                        plugins: {
-                                            legend: { display: false },
-                                            tooltip: {
-                                                callbacks: {
-                                                    label: function(context) {
-                                                        let label = context.dataset.label || '';
-                                                        if (label) { label += ': '; }
-                                                        if (context.parsed.x !== null) { label += context.parsed.x.toFixed(4); }
-                                                        return label;
-                                                    }
+                    // --- Exibir Resultados Individuais ---
+                    data.individual_results.forEach((result, index) => {
+                        const card = document.createElement('div');
+                        card.className = 'individual-result-card';
+                        card.innerHTML = `
+                            <h3 class="text-info">Análise para: <span class="text-break">${result.url}</span></h3>
+                        `;
+
+                        if (result.status === 'error') {
+                            card.innerHTML += `<p class="alert alert-warning">${result.message}</p>`;
+                        } else {
+                            const detectedLangDisplay = result.detected_language ?
+                                `<span class="badge bg-primary ms-2">${result.detected_language.toUpperCase()}</span>` : '';
+
+                            card.innerHTML += `
+                                <h5 class="mt-3">Idioma Detectado: ${detectedLangDisplay}</h5>
+                                <div class="chart-container">
+                                    <canvas id="keywordsChart-${index}"></canvas>
+                                </div>
+                                <h4 class="mt-3">Palavras-chave Detalhadas:</h4>
+                                <ul class="list-group keywords-list-${index}"></ul>
+                            `;
+                            individualResultsContainer.appendChild(card);
+
+                            const labels = result.top_keywords.map(item => item[0]);
+                            const scores = result.top_keywords.map(item => item[1]);
+
+                            const ctx = document.getElementById(`keywordsChart-${index}`).getContext('2d');
+                            new Chart(ctx, {
+                                type: 'bar',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Score TF-IDF',
+                                        data: scores,
+                                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                                        borderColor: 'rgba(54, 162, 235, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    indexAxis: 'y',
+                                    plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    let label = context.dataset.label || '';
+                                                    if (label) { label += ': '; }
+                                                    if (context.parsed.x !== null) { label += context.parsed.x.toFixed(4); }
+                                                    return label;
                                                 }
                                             }
-                                        },
-                                        scales: {
-                                            x: { beginAtZero: true, title: { display: true, text: 'Score TF-IDF' } },
-                                            y: { title: { display: true, text: 'Palavra-chave' } }
                                         }
+                                    },
+                                    scales: {
+                                        x: { beginAtZero: true, title: { display: true, text: 'Score TF-IDF' } },
+                                        y: { title: { display: true, text: 'Palavra-chave' } }
                                     }
-                                });
+                                }
+                            });
 
-                                const currentKeywordsList = card.querySelector(`.keywords-list-${index}`);
-                                result.top_keywords.forEach(item => {
-                                    const li = document.createElement('li');
-                                    li.className = 'list-group-item';
-                                    li.innerHTML = `<strong>${item[0]}</strong> <span class="badge bg-secondary rounded-pill">${item[1].toFixed(4)}</span>`;
-                                    currentKeywordsList.appendChild(li);
-                                });
-                            }
-                            individualResultsContainer.appendChild(card);
-                        });
-
-                        if (data.comparison.common_keywords.length === 0) {
-                            commonKeywordsList.innerHTML = '<li class="text-muted">Não foram encontradas palavras-chave comuns entre os sites analisados.</li>';
-                        } else {
-                            const sortedCommonKeywords = data.comparison.common_keywords.sort();
-                            sortedCommonKeywords.forEach(keyword => {
+                            const currentKeywordsList = card.querySelector(`.keywords-list-${index}`);
+                            result.top_keywords.forEach(item => {
                                 const li = document.createElement('li');
-                                li.textContent = keyword;
-                                commonKeywordsList.appendChild(li);
+                                li.className = 'list-group-item';
+                                li.innerHTML = `<strong>${item[0]}</strong> <span class="badge bg-secondary rounded-pill">${item[1].toFixed(4)}</span>`;
+                                currentKeywordsList.appendChild(li);
                             });
                         }
+                        individualResultsContainer.appendChild(card);
+                    });
 
-                        data.comparison.unique_keywords_per_url.forEach(url_unique => {
-                            const uniqueCard = document.createElement('div');
-                            uniqueCard.className = 'card mb-2';
-                            uniqueCard.innerHTML = `
-                                <div class="card-header bg-light">Palavras Únicas para: <span class="text-break">${url_unique.url}</span></div>
-                                <div class="card-body">
-                                    <ul class="unique-keywords-list d-flex flex-wrap gap-2"></ul>
-                                </div>
-                            `;
-                            const uniqueList = uniqueCard.querySelector('ul');
-                            if (url_unique.keywords.length === 0) {
-                                uniqueList.innerHTML = '<li class="text-muted">Nenhuma palavra-chave única encontrada para esta URL.</li>';
-                            } else {
-                                const sortedUniqueKeywords = url_unique.keywords.sort();
-                                sortedUniqueKeywords.forEach(keyword => {
-                                    const li = document.createElement('li');
-                                    li.textContent = keyword;
-                                    uniqueList.appendChild(li);
-                                });
-                            }
-                            uniqueKeywordsContainer.appendChild(uniqueCard);
-                        });
-
-                        resultsDiv.style.display = 'block';
-                        exportButtonsContainer.style.display = 'block';
-
+                    if (data.comparison.common_keywords.length === 0) {
+                        commonKeywordsList.innerHTML = '<li class="text-muted">Não foram encontradas palavras-chave comuns entre os sites analisados.</li>';
                     } else {
-                        errorAlert.textContent = data.error || 'Ocorreu um erro desconhecido ao analisar as URLs.';
-                        errorAlert.style.display = 'block';
-                        exportButtonsContainer.style.display = 'none';
+                        const sortedCommonKeywords = data.comparison.common_keywords.sort();
+                        sortedCommonKeywords.forEach(keyword => {
+                            const li = document.createElement('li');
+                            li.textContent = keyword;
+                            commonKeywordsList.appendChild(li);
+                        });
                     }
+
+                    data.comparison.unique_keywords_per_url.forEach(url_unique => {
+                        const uniqueCard = document.createElement('div');
+                        uniqueCard.className = 'card mb-2';
+                        uniqueCard.innerHTML = `
+                            <div class="card-header bg-light">Palavras Únicas para: <span class="text-break">${url_unique.url}</span></div>
+                            <div class="card-body">
+                                <ul class="unique-keywords-list d-flex flex-wrap gap-2"></ul>
+                            </div>
+                        `;
+                        const uniqueList = uniqueCard.querySelector('ul');
+                        if (url_unique.keywords.length === 0) {
+                            uniqueList.innerHTML = '<li class="text-muted">Nenhuma palavra-chave única encontrada para esta URL.</li>';
+                        } else {
+                            const sortedUniqueKeywords = url_unique.keywords.sort();
+                            sortedUniqueKeywords.forEach(keyword => {
+                                const li = document.createElement('li');
+                                li.textContent = keyword;
+                                uniqueList.appendChild(li);
+                            });
+                        }
+                        uniqueKeywordsContainer.appendChild(uniqueCard);
+                    });
+
+                    resultsDiv.style.display = 'block';
+                    exportButtonsContainer.style.display = 'block';
+
                 } catch (error) {
                     errorAlert.textContent = `Erro de conexão ou problema inesperado: ${error.message}. Verifique se o backend está rodando.`;
                     errorAlert.style.display = 'block';
